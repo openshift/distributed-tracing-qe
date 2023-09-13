@@ -1,0 +1,7 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rapidast-job
+  namespace: rapidast-otel
+status:
+  succeeded: 1

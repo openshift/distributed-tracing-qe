@@ -315,7 +315,7 @@ data:
       zap:
         apiScan:
           apis:
-            apiUrl: "https://kubernetes.default.svc/openapi/v3/apis/jaegers.jaegertracing.io/v1"
+            apiUrl: "https://kubernetes.default.svc/openapi/v3/apis/jaegertracing.io/v1"
         passiveScan:
           disabledRules: "2,10015,10027,10096,10024,10054"
         activeScan:

@@ -36,7 +36,7 @@ spec:
         - sh
         - -c
         - cp /helm/config/helmcustomscan.policy /home/rapidast/.ZAP/policies/helm-custom-scan.policy
-          && rapidast.py --config /helm/config/rapidastconfig.yaml && find /home/rapidast/results/tempo -name zap-report.json -exec cat {} \;
+          && rapidast.py --log-level debug --config /helm/config/rapidastconfig.yaml && find /home/rapidast/results/tempo -name zap-report.json -exec cat {} \;
         image: quay.io/redhatproductsecurity/rapidast:latest
         imagePullPolicy: Always
         name: rapidast-chart

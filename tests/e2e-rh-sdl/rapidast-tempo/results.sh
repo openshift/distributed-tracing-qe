@@ -52,12 +52,12 @@ kubectl -n rapidast-tempo delete pod $RANDOM_NAME
 
 # Function to search for zap-report.json recursively
 search_for_zap_report() {
-  local dir="$1"
+  local dir="$1/tempo"
   local found=0
   while IFS= read -r -d '' file; do
     if [[ "$file" == *"zap-report.json" ]]; then
       found=1
-      if grep -q '"riskdesc": "High"' "$file"; then
+      if grep -q '"riskdesc": "High' "$file"; then
         echo "Found 'zap-report.json' containing 'riskdesc': 'High' in $file, failing..."
         exit 1
       else

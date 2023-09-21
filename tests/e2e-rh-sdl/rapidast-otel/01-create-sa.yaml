@@ -17,3 +17,17 @@ subjects:
 - kind: ServiceAccount
   name: privileged-sa
   namespace: rapidast-otel
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rapidast-otel-cluster-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: privileged-sa
+  namespace: rapidast-otel

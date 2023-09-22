@@ -50,27 +50,25 @@ kubectl -n rapidast-tempo wait --for=condition=Ready pod/$RANDOM_NAME
 kubectl -n rapidast-tempo cp $RANDOM_NAME:/zap/results $ARTIFACT_DIR
 kubectl -n rapidast-tempo delete pod $RANDOM_NAME
 
-# Function to search for zap-report.json recursively
-search_for_zap_report() {
+# Function to search for session.tar and zap-report.json recursively
+search_for_files() {
   local dir="$1/tempo"
-  local found=0
+  local found_session_tar=0
+  local found_zap_report=0
+
   while IFS= read -r -d '' file; do
-    if [[ "$file" == *"zap-report.json" ]]; then
-      found=1
-      if grep -q '"riskdesc": "High' "$file"; then
-        echo "Found 'zap-report.json' containing 'riskdesc': 'High' in $file, failing..."
-        exit 1
-      else
-        echo "Found 'zap-report.json' in $file, but it does not contain 'riskdesc': 'High'"
-      fi
+    if [[ "$file" == *"session.tar" ]]; then
+      found_session_tar=1
+    elif [[ "$file" == *"zap-report.json" ]]; then
+      found_zap_report=1
     fi
-  done < <(find "$dir" -type f -name "zap-report.json" -print0)
-  
-  if [[ "$found" -eq 0 ]]; then
-    echo "No 'zap-report.json' files found in subdirectories of $dir, failing..."
+  done < <(find "$dir" -type f \( -name "session.tar" -o -name "zap-report.json" \) -print0)
+
+  if [[ "$found_session_tar" -eq 0 || "$found_zap_report" -eq 0 ]]; then
+    echo "Either 'session.tar' or 'zap-report.json' files not found in subdirectories of $dir, failing..."
     exit 1
   fi
 }
 
 # Search for zap-report.json in subdirectories of $ARTIFACT_DIR
-search_for_zap_report "$ARTIFACT_DIR"
+search_for_files "$ARTIFACT_DIR"

@@ -1,0 +1,378 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    kubernetes.io/metadata.name: kuttl-jaeger-otel-sidecar
+  name: kuttl-jaeger-otel-sidecar
+status:
+  phase: Active
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: query
+    app.kubernetes.io/instance: jaeger-production
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: jaeger-production-query
+    app.kubernetes.io/part-of: jaeger
+    sidecar.jaegertracing.io/injected: jaeger-production
+  name: jaeger-production-query
+  namespace: kuttl-jaeger-otel-sidecar
+status:
+  availableReplicas: 1
+  readyReplicas: 1
+  replicas: 1
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: collector
+    app.kubernetes.io/instance: jaeger-production
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: jaeger-production-collector
+    app.kubernetes.io/part-of: jaeger
+  name: jaeger-production-collector
+  namespace: kuttl-jaeger-otel-sidecar
+status:
+  availableReplicas: 1
+  readyReplicas: 1
+  replicas: 1
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    cluster-name: elasticsearch
+    component: elasticsearch
+    es-node-client: "true"
+    es-node-data: "true"
+    es-node-master: "true"
+    node-name: elasticsearch-cdm-kuttljaegerotelsidecarjaegerproduction-1
+  name: elasticsearch-cdm-kuttljaegerotelsidecarjaegerproduction-1
+  namespace: kuttl-jaeger-otel-sidecar
+status:
+  availableReplicas: 1
+  readyReplicas: 1
+  replicas: 1
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: hpa-collector
+    app.kubernetes.io/instance: jaeger-production
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: jaeger-production-collector
+    app.kubernetes.io/part-of: jaeger
+  name: jaeger-production-collector
+  namespace: kuttl-jaeger-otel-sidecar
+spec:
+  maxReplicas: 100
+  metrics:
+  - resource:
+      name: memory
+      target:
+        averageUtilization: 90
+        type: Utilization
+    type: Resource
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 90
+        type: Utilization
+    type: Resource
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: jaeger-production-collector
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: cronjob-es-index-cleaner
+    app.kubernetes.io/instance: jaeger-production
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: jaeger-production-es-index-cleaner
+    app.kubernetes.io/part-of: jaeger
+  name: jaeger-production-es-index-cleaner
+  namespace: kuttl-jaeger-otel-sidecar
+spec:
+  concurrencyPolicy: Allow
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      parallelism: 1
+      template:
+        metadata:
+          annotations:
+            linkerd.io/inject: disabled
+            prometheus.io/scrape: "false"
+            sidecar.istio.io/inject: "false"
+          labels:
+            app: jaeger
+            app.kubernetes.io/component: cronjob-es-index-cleaner
+            app.kubernetes.io/instance: jaeger-production
+            app.kubernetes.io/managed-by: jaeger-operator
+            app.kubernetes.io/name: jaeger-production-es-index-cleaner
+            app.kubernetes.io/part-of: jaeger
+        spec:
+          containers:
+          - args:
+            - "7"
+            - https://elasticsearch:9200
+            env:
+            - name: SKIP_DEPENDENCIES
+              value: "true"
+            - name: ES_TLS_ENABLED
+              value: "true"
+            - name: ES_TLS_CA
+              value: /certs/ca
+            - name: ES_TLS_KEY
+              value: /certs/key
+            - name: ES_TLS_CERT
+              value: /certs/cert
+            - name: SHARDS
+              value: "1"
+            - name: REPLICAS
+              value: "0"
+            image: registry.redhat.io/rhosdt/jaeger-es-index-cleaner-rhel8@sha256:8ac1b958ff16ea16f4d0c7132e3d369848a829d6655e0b2338a9bef93d54f02d
+            imagePullPolicy: IfNotPresent
+            name: jaeger-production-es-index-cleaner
+            resources: {}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /etc/pki/ca-trust/extracted/pem
+              name: jaeger-production-trusted-ca
+              readOnly: true
+            - mountPath: /certs
+              name: certs
+              readOnly: true
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          serviceAccount: jaeger-production
+          serviceAccountName: jaeger-production
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - configMap:
+              defaultMode: 420
+              items:
+              - key: ca-bundle.crt
+                path: tls-ca-bundle.pem
+              name: jaeger-production-trusted-ca
+            name: jaeger-production-trusted-ca
+          - name: certs
+            secret:
+              defaultMode: 420
+              secretName: jaeger-production-curator
+  schedule: 55 23 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    cluster-name: elasticsearch
+  name: elasticsearch
+  namespace: kuttl-jaeger-otel-sidecar
+spec:
+  ports:
+  - name: elasticsearch
+    port: 9200
+    protocol: TCP
+    targetPort: restapi
+  selector:
+    cluster-name: elasticsearch
+    es-node-client: "true"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    cluster-name: elasticsearch
+  name: elasticsearch-cluster
+  namespace: kuttl-jaeger-otel-sidecar
+spec:
+  ports:
+  - name: elasticsearch
+    port: 9300
+    protocol: TCP
+    targetPort: cluster
+  selector:
+    cluster-name: elasticsearch
+    es-node-master: "true"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    cluster-name: elasticsearch
+    scrape-metrics: enabled
+  name: elasticsearch-metrics
+  namespace: kuttl-jaeger-otel-sidecar
+spec:
+  ports:
+  - name: elasticsearch
+    port: 60001
+    protocol: TCP
+    targetPort: metrics
+  selector:
+    cluster-name: elasticsearch
+    es-node-client: "true"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: service-collector
+    app.kubernetes.io/instance: jaeger-production
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: jaeger-production-collector
+    app.kubernetes.io/part-of: jaeger
+  name: jaeger-production-collector
+  namespace: kuttl-jaeger-otel-sidecar
+spec:
+  ports:
+  - name: http-zipkin
+    port: 9411
+    protocol: TCP
+    targetPort: 9411
+  - name: tls-grpc-jaeger
+    port: 14250
+    protocol: TCP
+    targetPort: 14250
+  - name: http-c-tchan-trft
+    port: 14267
+    protocol: TCP
+    targetPort: 14267
+  - name: http-c-binary-trft
+    port: 14268
+    protocol: TCP
+    targetPort: 14268
+  - name: admin-http
+    port: 14269
+    protocol: TCP
+    targetPort: 14269
+  - name: grpc-otlp
+    port: 4317
+    protocol: TCP
+    targetPort: 4317
+  - name: http-otlp
+    port: 4318
+    protocol: TCP
+    targetPort: 4318
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: service-collector
+    app.kubernetes.io/instance: jaeger-production
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: jaeger-production-collector
+    app.kubernetes.io/part-of: jaeger
+  name: jaeger-production-collector-headless
+  namespace: kuttl-jaeger-otel-sidecar
+spec:
+  ports:
+  - name: http-zipkin
+    port: 9411
+    protocol: TCP
+    targetPort: 9411
+  - name: tls-grpc-jaeger
+    port: 14250
+    protocol: TCP
+    targetPort: 14250
+  - name: http-c-tchan-trft
+    port: 14267
+    protocol: TCP
+    targetPort: 14267
+  - name: http-c-binary-trft
+    port: 14268
+    protocol: TCP
+    targetPort: 14268
+  - name: admin-http
+    port: 14269
+    protocol: TCP
+    targetPort: 14269
+  - name: grpc-otlp
+    port: 4317
+    protocol: TCP
+    targetPort: 4317
+  - name: http-otlp
+    port: 4318
+    protocol: TCP
+    targetPort: 4318
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: service-query
+    app.kubernetes.io/instance: jaeger-production
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: jaeger-production-query
+    app.kubernetes.io/part-of: jaeger
+  name: jaeger-production-query
+  namespace: kuttl-jaeger-otel-sidecar
+spec:
+  ports:
+  - name: http-query
+    port: 16686
+    protocol: TCP
+    targetPort: 16686
+  - name: grpc-query
+    port: 16685
+    protocol: TCP
+    targetPort: 16685
+  - name: admin-http
+    port: 16687
+    protocol: TCP
+    targetPort: 16687
+
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: query-route
+    app.kubernetes.io/instance: jaeger-production
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: jaeger-production
+    app.kubernetes.io/part-of: jaeger
+  name: jaeger-production
+  namespace: kuttl-jaeger-otel-sidecar
+spec:
+  port:
+    targetPort: http-query
+  tls:
+    termination: edge
+  to:
+    kind: Service
+    name: jaeger-production-query
+    weight: 100

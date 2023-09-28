@@ -76,25 +76,14 @@ metadata:
   name: jaeger-production-collector
   namespace: kuttl-jaeger-otel-sidecar
 spec:
-  maxReplicas: 100
-  metrics:
-  - resource:
-      name: memory
-      target:
-        averageUtilization: 90
-        type: Utilization
-    type: Resource
-  - resource:
-      name: cpu
-      target:
-        averageUtilization: 90
-        type: Utilization
-    type: Resource
   minReplicas: 1
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: jaeger-production-collector
+status:
+  currentReplicas: 1
+  desiredReplicas: 0
 
 ---
 apiVersion: batch/v1

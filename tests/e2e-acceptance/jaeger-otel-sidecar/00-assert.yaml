@@ -137,7 +137,6 @@ spec:
               value: "1"
             - name: REPLICAS
               value: "0"
-            image: registry.redhat.io/rhosdt/jaeger-es-index-cleaner-rhel8@sha256:8ac1b958ff16ea16f4d0c7132e3d369848a829d6655e0b2338a9bef93d54f02d
             imagePullPolicy: IfNotPresent
             name: jaeger-production-es-index-cleaner
             resources: {}

@@ -14,7 +14,7 @@ function exit_error() {
 echo "*Jaeger image Details*"
 echo
 
-jaeger_images=$(oc get deployment jaeger-operator -n openshift-operators -o yaml | grep -o "registry.redhat.io/rhosdt/.*" | sed 's/registry.redhat.io/registry.stage.redhat.io/' | sort | uniq)
+jaeger_images=$(oc get deployment jaeger-operator -n openshift-distributed-tracing -o yaml | grep -o "registry.redhat.io/rhosdt/.*" | sed 's/registry.redhat.io/registry.stage.redhat.io/' | sort | uniq)
 [ $(echo "$jaeger_images" | wc -l) -eq 8 ] || exit_error "Expected 8 images, found:\n$jaeger_images"
 
 echo "{noformat}"
@@ -39,7 +39,7 @@ echo
 echo "*OpenTelemetry image Details*"
 echo
 
-otel_images=$(oc get deployment opentelemetry-operator-controller-manager -n openshift-operators -o yaml | grep -o "registry.redhat.io/rhosdt/.*" | sed 's/registry.redhat.io/registry.stage.redhat.io/' | sort | uniq)
+otel_images=$(oc get deployment opentelemetry-operator-controller-manager -n openshift-opentelemetry-operator -o yaml | grep -o "registry.redhat.io/rhosdt/.*" | sed 's/registry.redhat.io/registry.stage.redhat.io/' | sort | uniq)
 [ $(echo "$otel_images" | wc -l) -eq 2 ] || exit_error "Expected 2 images, found:\n$otel_images"
 
 echo "{noformat}"
@@ -64,8 +64,7 @@ echo
 echo "*Tempo image Details*"
 echo
 
-tempo_images=$(oc get deployment tempo-operator-controller-manager -n openshift-operators -o yaml && oc get configmap tempo-operator-manager-config -n openshift-operators -o yaml)
-tempo_images=$(echo "$tempo_images" | grep -o "registry.redhat.io/rhosdt/.*" | sed 's/registry.redhat.io/registry.stage.redhat.io/' | sort | uniq)
+tempo_images=$(oc get deployment tempo-operator-controller -n openshift-tempo-operator -o yaml | grep -o "registry.redhat.io/rhosdt/.*" | sed 's/registry.redhat.io/registry.stage.redhat.io/' | sort | uniq)
 [ $(echo "$tempo_images" | wc -l) -eq 5 ] || exit_error "Expected 5 images, found:\n$tempo_images"
 
 echo "{noformat}"
@@ -76,7 +75,7 @@ for image in $tempo_images; do
 
     if [[ $image == *tempo-rhel8@* ]]; then
       log_cmd podman run --rm $image --version
-    elif [[ $image == *tempo-gateway-rhel8* || $image == *opa-openshift-rhosdt-rhel8* ]]; then
+    elif [[ $image == *tempo-gateway-rhel8* || $image == *tempo-gateway-opa-rhel8* ]]; then
       echo "SKIPPED: $image doesn't have a version command"
     else
       log_cmd podman run --rm $image version

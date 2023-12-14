@@ -13,6 +13,16 @@ spec:
   strategy: production
   ingress:
     security: none
+  collector:
+    options:
+      collector:
+        otlp:
+          enabled: true
+          grpc:
+            tls:
+              enabled: true
+              cert: /etc/tls-config/tls.crt
+              key: /etc/tls-config/tls.key
   storage:
     type: elasticsearch
     elasticsearch:

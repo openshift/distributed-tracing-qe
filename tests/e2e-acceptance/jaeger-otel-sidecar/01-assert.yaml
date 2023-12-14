@@ -25,7 +25,6 @@ metadata:
     app.kubernetes.io/managed-by: opentelemetry-operator
     app.kubernetes.io/name: cluster-collector-collector
     app.kubernetes.io/part-of: opentelemetry
-    app.kubernetes.io/version: latest
   name: cluster-collector-collector
   namespace: kuttl-jaeger-otel-sidecar
 spec:
@@ -40,11 +39,11 @@ spec:
     port: 4318
     protocol: TCP
     targetPort: 4318
-  - appProtocol: http
-    name: otlp-http-legacy
-    port: 55681
-    protocol: TCP
-    targetPort: 4318
+  selector:
+    app.kubernetes.io/component: opentelemetry-collector
+    app.kubernetes.io/instance: kuttl-jaeger-otel-sidecar.cluster-collector
+    app.kubernetes.io/managed-by: opentelemetry-operator
+    app.kubernetes.io/part-of: opentelemetry
 
 ---
 apiVersion: v1
@@ -56,7 +55,6 @@ metadata:
     app.kubernetes.io/managed-by: opentelemetry-operator
     app.kubernetes.io/name: cluster-collector-collector
     app.kubernetes.io/part-of: opentelemetry
-    app.kubernetes.io/version: latest
     operator.opentelemetry.io/collector-headless-service: Exists
   name: cluster-collector-collector-headless
   namespace: kuttl-jaeger-otel-sidecar
@@ -72,11 +70,11 @@ spec:
     port: 4318
     protocol: TCP
     targetPort: 4318
-  - appProtocol: http
-    name: otlp-http-legacy
-    port: 55681
-    protocol: TCP
-    targetPort: 4318
+  selector:
+    app.kubernetes.io/component: opentelemetry-collector
+    app.kubernetes.io/instance: kuttl-jaeger-otel-sidecar.cluster-collector
+    app.kubernetes.io/managed-by: opentelemetry-operator
+    app.kubernetes.io/part-of: opentelemetry
 
 ---
 apiVersion: v1
@@ -88,7 +86,6 @@ metadata:
     app.kubernetes.io/managed-by: opentelemetry-operator
     app.kubernetes.io/name: cluster-collector-collector-monitoring
     app.kubernetes.io/part-of: opentelemetry
-    app.kubernetes.io/version: latest
   name: cluster-collector-collector-monitoring
   namespace: kuttl-jaeger-otel-sidecar
 spec:
@@ -97,3 +94,8 @@ spec:
     port: 8888
     protocol: TCP
     targetPort: 8888
+  selector:
+    app.kubernetes.io/component: opentelemetry-collector
+    app.kubernetes.io/instance: kuttl-jaeger-otel-sidecar.cluster-collector
+    app.kubernetes.io/managed-by: opentelemetry-operator
+    app.kubernetes.io/part-of: opentelemetry

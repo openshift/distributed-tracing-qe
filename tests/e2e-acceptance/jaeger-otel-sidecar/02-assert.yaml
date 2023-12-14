@@ -59,8 +59,6 @@ spec:
     prometheusCR: {}
     resources: {}
   upgradeStrategy: automatic
-status:
-  version: 0.81.0
 
 ---
 apiVersion: apps/v1

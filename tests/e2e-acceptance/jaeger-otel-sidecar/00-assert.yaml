@@ -99,17 +99,10 @@ metadata:
   name: jaeger-production-es-index-cleaner
   namespace: kuttl-jaeger-otel-sidecar
 spec:
-  concurrencyPolicy: Allow
-  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
-      parallelism: 1
       template:
         metadata:
-          annotations:
-            linkerd.io/inject: disabled
-            prometheus.io/scrape: "false"
-            sidecar.istio.io/inject: "false"
           labels:
             app: jaeger
             app.kubernetes.io/component: cronjob-es-index-cleaner
@@ -121,7 +114,7 @@ spec:
           containers:
           - args:
             - "7"
-            - https://elasticsearch:9200
+            - https://elasticsearch.kuttl-jaeger-otel-sidecar.svc.cluster.local:9200
             env:
             - name: SKIP_DEPENDENCIES
               value: "true"
@@ -137,39 +130,8 @@ spec:
               value: "1"
             - name: REPLICAS
               value: "0"
-            imagePullPolicy: IfNotPresent
-            name: jaeger-production-es-index-cleaner
-            resources: {}
-            terminationMessagePath: /dev/termination-log
-            terminationMessagePolicy: File
-            volumeMounts:
-            - mountPath: /etc/pki/ca-trust/extracted/pem
-              name: jaeger-production-trusted-ca
-              readOnly: true
-            - mountPath: /certs
-              name: certs
-              readOnly: true
-          dnsPolicy: ClusterFirst
-          restartPolicy: Never
-          schedulerName: default-scheduler
           serviceAccount: jaeger-production
           serviceAccountName: jaeger-production
-          terminationGracePeriodSeconds: 30
-          volumes:
-          - configMap:
-              defaultMode: 420
-              items:
-              - key: ca-bundle.crt
-                path: tls-ca-bundle.pem
-              name: jaeger-production-trusted-ca
-            name: jaeger-production-trusted-ca
-          - name: certs
-            secret:
-              defaultMode: 420
-              secretName: jaeger-production-curator
-  schedule: 55 23 * * *
-  successfulJobsHistoryLimit: 3
-  suspend: false
 
 ---
 apiVersion: v1

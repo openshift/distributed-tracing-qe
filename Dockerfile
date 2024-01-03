@@ -1,3 +1,4 @@
+# Dockerfile to build distributed-tracing-tests-runner image.
 FROM golang:1.20
 
 # Copy the repository files

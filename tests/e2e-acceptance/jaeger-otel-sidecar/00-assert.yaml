@@ -115,21 +115,6 @@ spec:
           - args:
             - "7"
             - https://elasticsearch.kuttl-jaeger-otel-sidecar.svc.cluster.local:9200
-            env:
-            - name: SKIP_DEPENDENCIES
-              value: "true"
-            - name: ES_TLS_ENABLED
-              value: "true"
-            - name: ES_TLS_CA
-              value: /certs/ca
-            - name: ES_TLS_KEY
-              value: /certs/key
-            - name: ES_TLS_CERT
-              value: /certs/cert
-            - name: SHARDS
-              value: "1"
-            - name: REPLICAS
-              value: "0"
           serviceAccount: jaeger-production
           serviceAccountName: jaeger-production
 

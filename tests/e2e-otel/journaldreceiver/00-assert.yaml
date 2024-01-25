@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    prometheus.io/path: /metrics
+    prometheus.io/port: "8888"
+    prometheus.io/scrape: "true"
+  labels:
+    app.kubernetes.io/component: opentelemetry-collector
+    app.kubernetes.io/instance: kuttl-journald.otel-joural-logs
+    app.kubernetes.io/managed-by: opentelemetry-operator
+    app.kubernetes.io/name: otel-joural-logs-collector
+    app.kubernetes.io/part-of: opentelemetry
+    app.kubernetes.io/version: latest
+  name: otel-joural-logs-collector
+  namespace: kuttl-journald
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: opentelemetry-collector
+      app.kubernetes.io/instance: kuttl-journald.otel-joural-logs
+      app.kubernetes.io/managed-by: opentelemetry-operator
+      app.kubernetes.io/part-of: opentelemetry
+  template:
+    metadata:
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8888"
+        prometheus.io/scrape: "true"
+      labels:
+        app.kubernetes.io/component: opentelemetry-collector
+        app.kubernetes.io/instance: kuttl-journald.otel-joural-logs
+        app.kubernetes.io/managed-by: opentelemetry-operator
+        app.kubernetes.io/name: otel-joural-logs-collector
+        app.kubernetes.io/part-of: opentelemetry
+        app.kubernetes.io/version: latest
+    spec:
+      containers:
+      - args:
+        - --config=/conf/collector.yaml
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        name: otc-container
+        ports:
+        - containerPort: 8888
+          name: metrics
+          protocol: TCP
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - NET_BIND_SERVICE
+            - SETGID
+            - SETPCAP
+            - SETUID
+          readOnlyRootFilesystem: true
+          seLinuxOptions:
+            type: spc_t
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - mountPath: /conf
+          name: otc-internal
+        - mountPath: /var/log/journal/
+          name: journal-logs
+          readOnly: true
+      serviceAccount: privileged-sa
+      serviceAccountName: privileged-sa
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      volumes:
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: collector.yaml
+            path: collector.yaml
+          name: otel-joural-logs-collector
+        name: otc-internal
+      - hostPath:
+          path: /var/log/journal
+          type: ""
+        name: journal-logs
+
+---
+---
+# This KUTTL assert uses the check-daemonset.sh script to ensure the number of ready pods in a daemonset matches the desired count, retrying until successful or a timeout occurs. The script is needed as the number of Kubernetes cluster nodes can vary and we cannot statically set desiredNumberScheduled and numberReady in the assert for daemonset status. 
+
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+commands:
+- script: ./tests/e2e-otel/journaldreceiver/check_daemonset.sh
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: opentelemetry-collector
+    app.kubernetes.io/instance: kuttl-journald.otel-joural-logs
+    app.kubernetes.io/managed-by: opentelemetry-operator
+    app.kubernetes.io/name: otel-joural-logs-collector-monitoring
+    app.kubernetes.io/part-of: opentelemetry
+    app.kubernetes.io/version: latest
+  name: otel-joural-logs-collector-monitoring
+  namespace: kuttl-journald
+spec:
+  ports:
+  - name: monitoring
+    port: 8888
+    protocol: TCP
+    targetPort: 8888
+  selector:
+    app.kubernetes.io/component: opentelemetry-collector
+    app.kubernetes.io/instance: kuttl-journald.otel-joural-logs
+    app.kubernetes.io/managed-by: opentelemetry-operator
+    app.kubernetes.io/part-of: opentelemetry

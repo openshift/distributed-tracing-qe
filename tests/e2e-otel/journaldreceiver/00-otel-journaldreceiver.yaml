@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kuttl-journald
+  labels:
+    security.openshift.io/scc.podSecurityLabelSync: "false"
+    pod-security.kubernetes.io/enforce: "privileged"
+    pod-security.kubernetes.io/audit: "privileged"
+    pod-security.kubernetes.io/warn: "privileged"
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: privileged-sa
+  namespace: kuttl-journald
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kuttl-journald--binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+- kind: ServiceAccount
+  name: privileged-sa
+  namespace: kuttl-journald
+
+---
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel-joural-logs
+  namespace: kuttl-journald
+spec:
+  mode: daemonset
+  serviceAccount: privileged-sa
+  serviceAccountName: privileged-sa
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - FSETID
+      - KILL
+      - NET_BIND_SERVICE
+      - SETGID
+      - SETPCAP
+      - SETUID
+    readOnlyRootFilesystem: true
+    seLinuxOptions:
+      type: spc_t
+    seccompProfile:
+      type: RuntimeDefault
+  image: quay.io/rhn_support_ikanse/otel-collector:latest
+  config: |
+    receivers:
+      journald:
+        files: /var/log/journal/*/*
+    processors:
+    exporters:
+      logging:
+        verbosity: detailed
+    service:
+      pipelines:
+        logs:
+          receivers: [journald]
+          processors: []
+          exporters: [logging]
+  volumeMounts:
+  - name: journal-logs
+    mountPath: /var/log/journal/
+    readOnly: true
+  volumes:
+  - name: journal-logs
+    type: ""
+    hostPath:
+      path: /var/log/journal
+  tolerations:
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule

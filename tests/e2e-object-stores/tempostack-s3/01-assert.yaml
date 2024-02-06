@@ -132,19 +132,20 @@ metadata:
   name: tempo-simplest-compactor
 spec:
   ports:
-    - name: http-memberlist
-      port: 7946
-      protocol: TCP
-      targetPort: http-memberlist
-    - name: http
-      port: 3200
-      protocol: TCP
-      targetPort: http
+  - name: http-memberlist
+    port: 7946
+    protocol: TCP
+    targetPort: http-memberlist
+  - name: http
+    port: 3200
+    protocol: TCP
+    targetPort: http
   selector:
     app.kubernetes.io/component: compactor
     app.kubernetes.io/instance: simplest
     app.kubernetes.io/managed-by: tempo-operator
     app.kubernetes.io/name: tempo
+
 ---
 apiVersion: v1
 kind: Service
@@ -157,43 +158,44 @@ metadata:
   name: tempo-simplest-distributor
 spec:
   ports:
-    - name: otlp-grpc
-      port: 4317
-      protocol: TCP
-      targetPort: otlp-grpc
-    - name: http
-      port: 3200
-      protocol: TCP
-      targetPort: http
-    - name: otlp-http
-      port: 4318
-      protocol: TCP
-      targetPort: otlp-http
-    - name: thrift-http
-      port: 14268
-      protocol: TCP
-      targetPort: thrift-http
-    - name: thrift-compact
-      port: 6831
-      protocol: UDP
-      targetPort: thrift-compact
-    - name: thrift-binary
-      port: 6832
-      protocol: UDP
-      targetPort: thrift-binary
-    - name: jaeger-grpc
-      port: 14250
-      protocol: TCP
-      targetPort: jaeger-grpc
-    - name: http-zipkin
-      port: 9411
-      protocol: TCP
-      targetPort: http-zipkin
+  - name: otlp-grpc
+    port: 4317
+    protocol: TCP
+    targetPort: otlp-grpc
+  - name: http
+    port: 3200
+    protocol: TCP
+    targetPort: http
+  - name: otlp-http
+    port: 4318
+    protocol: TCP
+    targetPort: otlp-http
+  - name: thrift-http
+    port: 14268
+    protocol: TCP
+    targetPort: thrift-http
+  - name: thrift-compact
+    port: 6831
+    protocol: UDP
+    targetPort: thrift-compact
+  - name: thrift-binary
+    port: 6832
+    protocol: UDP
+    targetPort: thrift-binary
+  - name: jaeger-grpc
+    port: 14250
+    protocol: TCP
+    targetPort: jaeger-grpc
+  - name: http-zipkin
+    port: 9411
+    protocol: TCP
+    targetPort: http-zipkin
   selector:
     app.kubernetes.io/component: distributor
     app.kubernetes.io/instance: simplest
     app.kubernetes.io/managed-by: tempo-operator
     app.kubernetes.io/name: tempo
+
 ---
 apiVersion: v1
 kind: Service
@@ -205,18 +207,18 @@ metadata:
     app.kubernetes.io/name: tempo
   name: tempo-simplest-gossip-ring
 spec:
-  clusterIP: None
-  publishNotReadyAddresses: true
   ports:
-    - name: http-memberlist
-      port: 7946
-      protocol: TCP
-      targetPort: http-memberlist
+  - name: http-memberlist
+    port: 7946
+    protocol: TCP
+    targetPort: http-memberlist
+  publishNotReadyAddresses: true
   selector:
     app.kubernetes.io/instance: simplest
     app.kubernetes.io/managed-by: tempo-operator
     app.kubernetes.io/name: tempo
     tempo-gossip-member: "true"
+
 ---
 apiVersion: v1
 kind: Service
@@ -229,19 +231,20 @@ metadata:
   name: tempo-simplest-ingester
 spec:
   ports:
-    - name: http
-      port: 3200
-      protocol: TCP
-      targetPort: http
-    - name: grpc
-      port: 9095
-      protocol: TCP
-      targetPort: grpc
+  - name: http
+    port: 3200
+    protocol: TCP
+    targetPort: http
+  - name: grpc
+    port: 9095
+    protocol: TCP
+    targetPort: grpc
   selector:
     app.kubernetes.io/component: ingester
     app.kubernetes.io/instance: simplest
     app.kubernetes.io/managed-by: tempo-operator
     app.kubernetes.io/name: tempo
+
 ---
 apiVersion: v1
 kind: Service
@@ -254,23 +257,24 @@ metadata:
   name: tempo-simplest-querier
 spec:
   ports:
-    - name: http-memberlist
-      port: 7946
-      protocol: TCP
-      targetPort: http-memberlist
-    - name: http
-      port: 3200
-      protocol: TCP
-      targetPort: http
-    - name: grpc
-      port: 9095
-      protocol: TCP
-      targetPort: grpc
+  - name: http-memberlist
+    port: 7946
+    protocol: TCP
+    targetPort: http-memberlist
+  - name: http
+    port: 3200
+    protocol: TCP
+    targetPort: http
+  - name: grpc
+    port: 9095
+    protocol: TCP
+    targetPort: grpc
   selector:
     app.kubernetes.io/component: querier
     app.kubernetes.io/instance: simplest
     app.kubernetes.io/managed-by: tempo-operator
     app.kubernetes.io/name: tempo
+
 ---
 apiVersion: v1
 kind: Service
@@ -283,31 +287,32 @@ metadata:
   name: tempo-simplest-query-frontend
 spec:
   ports:
-    - name: http
-      port: 3200
-      protocol: TCP
-      targetPort: http
-    - name: grpc
-      port: 9095
-      protocol: TCP
-      targetPort: grpc
-    - name: jaeger-gprc
-      port: 16685
-      protocol: TCP
-      targetPort: jaeger-gprc
-    - name: jaeger-ui
-      port: 16686
-      protocol: TCP
-      targetPort: jaeger-ui
-    - name: jaeger-metrics
-      port: 16687
-      protocol: TCP
-      targetPort: jaeger-metrics
+  - name: http
+    port: 3200
+    protocol: TCP
+    targetPort: http
+  - name: grpc
+    port: 9095
+    protocol: TCP
+    targetPort: grpc
+  - name: jaeger-grpc
+    port: 16685
+    protocol: TCP
+    targetPort: jaeger-grpc
+  - name: jaeger-ui
+    port: 16686
+    protocol: TCP
+    targetPort: jaeger-ui
+  - name: jaeger-metrics
+    port: 16687
+    protocol: TCP
+    targetPort: jaeger-metrics
   selector:
     app.kubernetes.io/component: query-frontend
     app.kubernetes.io/instance: simplest
     app.kubernetes.io/managed-by: tempo-operator
     app.kubernetes.io/name: tempo
+
 ---
 apiVersion: v1
 kind: Service
@@ -319,37 +324,37 @@ metadata:
     app.kubernetes.io/name: tempo
   name: tempo-simplest-query-frontend-discovery
 spec:
-  clusterIP: None
-  publishNotReadyAddresses: true
   ports:
-    - name: http
-      port: 3200
-      protocol: TCP
-      targetPort: http
-    - name: grpc
-      port: 9095
-      protocol: TCP
-      targetPort: grpc
-    - name: grpclb
-      port: 9096
-      protocol: TCP
-      targetPort: grpclb
-    - name: jaeger-gprc
-      port: 16685
-      protocol: TCP
-      targetPort: jaeger-gprc
-    - name: jaeger-ui
-      port: 16686
-      protocol: TCP
-      targetPort: jaeger-ui
-    - name: jaeger-metrics
-      port: 16687
-      protocol: TCP
-      targetPort: jaeger-metrics
+  - name: http
+    port: 3200
+    protocol: TCP
+    targetPort: http
+  - name: grpc
+    port: 9095
+    protocol: TCP
+    targetPort: grpc
+  - name: grpclb
+    port: 9096
+    protocol: TCP
+    targetPort: grpclb
+  - name: jaeger-grpc
+    port: 16685
+    protocol: TCP
+    targetPort: jaeger-grpc
+  - name: jaeger-ui
+    port: 16686
+    protocol: TCP
+    targetPort: jaeger-ui
+  - name: jaeger-metrics
+    port: 16687
+    protocol: TCP
+    targetPort: jaeger-metrics
+  publishNotReadyAddresses: true
   selector:
     app.kubernetes.io/component: query-frontend
     app.kubernetes.io/instance: simplest
     app.kubernetes.io/managed-by: tempo-operator
+    app.kubernetes.io/name: tempo
 #
 # Ingresses
 #

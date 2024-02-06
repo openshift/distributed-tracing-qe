@@ -18,17 +18,20 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Remove the bucket if it exists
-aws s3 rb s3://$BUCKET_NAME --region $REGION --force
-if [ $? -ne 0 ]; then
-    echo "Failed to remove bucket"
-    exit 1
-fi
-
-# Check if the bucket still exists
+# Check if the bucket exists
 if aws s3api head-bucket --bucket $BUCKET_NAME --region $REGION 2>/dev/null; then
-    echo "Bucket still exists after deletion, wait for 30 seconds."
-    sleep 30
+    # Remove the bucket if it exists
+    aws s3 rb s3://$BUCKET_NAME --region $REGION --force
+    if [ $? -ne 0 ]; then
+        echo "Failed to remove bucket"
+        exit 1
+    fi
+
+    # Check if the bucket still exists
+    if aws s3api head-bucket --bucket $BUCKET_NAME --region $REGION 2>/dev/null; then
+        echo "Bucket still exists after deletion, wait for 30 seconds."
+        sleep 30
+    fi
 fi
 
 # Create a new bucket

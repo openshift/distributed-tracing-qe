@@ -319,7 +319,7 @@ data:
         passiveScan:
           disabledRules: "2,10015,10027,10096,10024,10054"
         activeScan:
-          policy: "API-scan-minimal"
+          policy: "Operator-scan"
         miscOptions:
           enableUI: False
           updateAddons: False

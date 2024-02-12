@@ -11,7 +11,7 @@ function log_cmd() {
 podman pull docker.io/nouchka/sqlite3 -q > /dev/null
 
 # the path to the SQLite db changed in OCP v4.11
-for ocp_version in 4.11 4.12 4.13 4.14 4.15; do
+for ocp_version in 4.12 4.13 4.14 4.15 4.16; do
     echo "*OCP $ocp_version*"
     echo "{noformat}"
     log_cmd oc image extract \

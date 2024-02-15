@@ -40,7 +40,7 @@ echo "*OpenTelemetry image Details*"
 echo
 
 otel_images=$(oc get deployment opentelemetry-operator-controller-manager -n openshift-opentelemetry-operator -o yaml | grep -o "registry.redhat.io/rhosdt/.*" | sed 's/registry.redhat.io/registry.stage.redhat.io/' | sort | uniq)
-[ $(echo "$otel_images" | wc -l) -eq 2 ] || exit_error "Expected 2 images, found:\n$otel_images"
+[ $(echo "$otel_images" | wc -l) -eq 3 ] || exit_error "Expected 2 images, found:\n$otel_images"
 
 echo "{noformat}"
 for image in $otel_images; do
@@ -50,6 +50,8 @@ for image in $otel_images; do
 
     if [[ $image == *opentelemetry-rhel8-operator* ]]; then
         log_cmd podman run --rm $image |& head -n2
+    elif [[ $image == *opentelemetry-target-allocator-rhel8* ]]; then
+      echo "SKIPPED: $image doesn't have a version command"
     else
         log_cmd podman run --rm $image --version
     fi

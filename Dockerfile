@@ -1,4 +1,4 @@
-FROM golang:1.20
+FROM golang:1.21
 
 # Copy the repository files
 COPY . /tmp/distributed-tracing-qe
@@ -18,10 +18,8 @@ RUN mkdir -p /tmp/go/bin $GOCACHE \
 # Install dependencies required by test cases and debugging
 RUN apt-get update && apt-get install -y jq vim libreadline-dev
 
-# Install kuttl
-RUN curl -LO https://github.com/kudobuilder/kuttl/releases/download/v0.15.0/kubectl-kuttl_0.15.0_linux_x86_64 \
-    && chmod +x kubectl-kuttl_0.15.0_linux_x86_64 \
-    && mv kubectl-kuttl_0.15.0_linux_x86_64 /usr/local/bin/kuttl
+# Install Chainsaw e2e testing tool
+RUN go install github.com/kyverno/chainsaw@v0.1.5
 
 # Install kubectl and oc
 RUN curl -LO https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest/openshift-client-linux.tar.gz \

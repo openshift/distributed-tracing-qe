@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define constants
-BUCKET_NAME="ikanse-tempo"
+BUCKET_NAME="ikanse-tempostack-s3"
 REGION="us-east-2"
 AWS_BUCKET_ENDPOINT="https://s3.${REGION}.amazonaws.com"
 

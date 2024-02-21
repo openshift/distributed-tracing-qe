@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define constants
-BUCKET_NAME="ikanse-tempo"
+BUCKET_NAME="ikanse-tempostack-gcs"
 
 oc extract -n kube-system secret/gcp-credentials --to=/tmp --confirm
 if [ $? -ne 0 ]; then

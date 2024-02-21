@@ -2,7 +2,7 @@
 
 set -e
 
-AZURE_RESOURCE_GROUP_NAME=ikanse-group
+AZURE_RESOURCE_GROUP_NAME=ikanse-tempostack-azure
 AZURE_RESOURCE_GROUP_LOCATION=eastus
 AZURE_STORAGE_AZURE_ACCOUNTNAME="ikansest"
 SECRETNAME="azure-secret"

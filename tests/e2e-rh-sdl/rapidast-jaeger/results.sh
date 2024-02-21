@@ -7,7 +7,7 @@ TMP_DIR=/tmp
 ARTIFACT_DIR=${ARTIFACT_DIR}
 
 # Name for rapiterm pod
-RANDOM_NAME=rapiterm-$RANDOM
+RANDOM_NAME=rapiterm-jaeger
 
 # Name of PVC in RapiDAST Resource, i.e. which PVC to mount to grab results
 PVC=rapidast-pvc

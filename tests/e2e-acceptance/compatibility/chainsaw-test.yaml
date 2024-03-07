@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
@@ -20,8 +21,8 @@ spec:
   - name: step-02
     try:
     - script:
-        content: /bin/sh -c "kubectl get --namespace $NAMESPACE tempo simplest -o
-          jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' | grep True"
+        timeout: 5m
+        content: kubectl get --namespace $NAMESPACE tempo simplest -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' | grep True
   - name: step-03
     try:
     - apply:

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-JAEGER_URL=$(oc -n kuttl-otlp-metrics get route jaeger-allinone -o json | jq '.spec.host' -r)
+JAEGER_URL=$(oc -n chainsaw-otlp-metrics get route jaeger-allinone -o json | jq '.spec.host' -r)
 SERVICE_NAME="telemetrygen"
 
 while true; do

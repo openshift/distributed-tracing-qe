@@ -75,7 +75,7 @@ spec:
         sidecar.opentelemetry.io/inject: "true"
     spec:
       containers:
-      - image: quay.io/jkandasa/vertx-create-span:operator-e2e-tests
+      - image: docker.io/jaegertracing/vertx-create-span:operator-e2e-tests
         imagePullPolicy: Always
         name: sample-app
         ports:

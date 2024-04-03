@@ -1,0 +1,41 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: ossm-tempostack
+spec:
+  steps:
+  - name: step-00
+    try:
+    - apply:
+        file: 00-install-ossm.yaml
+    - assert:
+        file: 00-assert.yaml
+  - name: step-01
+    try:
+    - patch:
+        file: 01-update-kiali.yaml
+    - assert:
+        file: 01-assert.yaml
+  - name: step-02
+    try:
+    - apply:
+        file: 02-install-minio.yaml
+    - assert:
+        file: 02-assert.yaml
+  - name: step-03
+    try:
+    - apply:
+        file: 03-install-tempo.yaml
+    - assert:
+        file: 03-assert.yaml
+  - name: step-04
+    try:
+    - apply:
+        file: 04-apply-telemetry-cr.yaml
+    - assert:
+        file: 04-assert.yaml
+  - name: step-05
+    try:
+    - apply:
+        file: 05-install-bookinfo.yaml

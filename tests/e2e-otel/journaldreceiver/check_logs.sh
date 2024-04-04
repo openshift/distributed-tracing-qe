@@ -1,10 +1,9 @@
-
 #!/bin/bash
 # This script checks the OpenTelemetry collector pod for the presence of Logs.
 
 # Define the label selector
 LABEL_SELECTOR="app.kubernetes.io/component=opentelemetry-collector"
-NAMESPACE=kuttl-journald
+NAMESPACE=chainsaw-journald
 
 # Define the search strings
 SEARCH_STRING1='_SYSTEMD_UNIT'
@@ -14,7 +13,7 @@ SEARCH_STRING4='_SYSTEMD_INVOCATION_ID'
 SEARCH_STRING5='_SELINUX_CONTEXT'
 
 # Get the list of pods with the specified label
-PODS=$(kubectl -n $NAMESPACE get pods -l $LABEL_SELECTOR -o jsonpath='{.items[*].metadata.name}')
+PODS=($(kubectl -n $NAMESPACE get pods -l $LABEL_SELECTOR -o jsonpath='{.items[*].metadata.name}'))
 
 # Initialize flags to track if strings are found
 FOUND1=false
@@ -24,7 +23,7 @@ FOUND4=false
 FOUND5=false
 
 # Loop through each pod and search for the strings in the logs
-for POD in $PODS; do
+for POD in "${PODS[@]}"; do
     # Search for the first string
     if ! $FOUND1 && kubectl -n $NAMESPACE --tail=100 logs $POD | grep -q -- "$SEARCH_STRING1"; then
         echo "\"$SEARCH_STRING1\" found in $POD"

@@ -1,14 +1,3 @@
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-  - command: kubectl -n $NAMESPACE create rolebinding default-view-$NAMESPACE --role=pod-view --serviceaccount=$NAMESPACE:ta
-  # Annotate the namespace to allow the application to run using an specific group and user in OpenShift
-  # https://docs.openshift.com/dedicated/authentication/managing-security-context-constraints.html
-  # This annotation has no effect in Kubernetes
-  - command: kubectl annotate namespace ${NAMESPACE} openshift.io/sa.scc.uid-range=1000/1000 --overwrite
-  - command: kubectl annotate namespace ${NAMESPACE} openshift.io/sa.scc.supplemental-groups=3000/1000 --overwrite
-
----
 apiVersion: opentelemetry.io/v1alpha1
 kind: OpenTelemetryCollector
 metadata:
@@ -39,7 +28,6 @@ metadata:
   name: otel-logs-sidecar
 spec:
   mode: sidecar
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.92.0
   config: |
     receivers:
       filelog:

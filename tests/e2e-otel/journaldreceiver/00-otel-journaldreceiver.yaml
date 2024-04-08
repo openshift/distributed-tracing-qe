@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: kuttl-journald
+  name: chainsaw-journald
   labels:
     security.openshift.io/scc.podSecurityLabelSync: "false"
     pod-security.kubernetes.io/enforce: "privileged"
@@ -13,13 +13,13 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: privileged-sa
-  namespace: kuttl-journald
+  namespace: chainsaw-journald
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: kuttl-journald--binding
+  name: chainsaw-journald--binding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -27,14 +27,14 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: privileged-sa
-  namespace: kuttl-journald
+  namespace: chainsaw-journald
 
 ---
 apiVersion: opentelemetry.io/v1alpha1
 kind: OpenTelemetryCollector
 metadata:
   name: otel-joural-logs
-  namespace: kuttl-journald
+  namespace: chainsaw-journald
 spec:
   mode: daemonset
   serviceAccount: privileged-sa
@@ -57,7 +57,6 @@ spec:
       type: spc_t
     seccompProfile:
       type: RuntimeDefault
-  image: quay.io/rhn_support_ikanse/otel-collector:latest
   config: |
     receivers:
       journald:
@@ -78,7 +77,6 @@ spec:
     readOnly: true
   volumes:
   - name: journal-logs
-    type: ""
     hostPath:
       path: /var/log/journal
   tolerations:

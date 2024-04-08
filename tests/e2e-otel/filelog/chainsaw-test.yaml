@@ -1,7 +1,6 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  creationTimestamp: null
   name: filelog
 spec:
   steps:
@@ -41,7 +40,8 @@ spec:
     try:
     - apply:
         file: 01-app-plaintext-logs.yaml
-    - script:
-        content: ./tests/e2e-otel/filelog/check_logs.sh
     - assert:
         file: 01-assert.yaml
+    - script:
+        timeout: 5m
+        content: ./check_logs.sh

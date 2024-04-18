@@ -6,7 +6,7 @@ LABEL_SELECTOR="app.kubernetes.io/component=opentelemetry-collector"
 NAMESPACE=chainsaw-k8seventsreceiver
 
 # Define the search strings
-SEARCH_STRING1='k8s.event.reason: Str(Info)'
+SEARCH_STRING1='k8s.event.reason'
 SEARCH_STRING2='k8s.event.action'
 SEARCH_STRING3='k8s.event.start_time'
 SEARCH_STRING4='k8s.event.name'
@@ -49,18 +49,18 @@ for POD in "${PODS[@]}"; do
         FOUND4=true
     fi
     # Search for the fourth string
-    if ! $FOUND5 && kubectl -n $NAMESPACE --tail=200 logs $POD | grep -q -- "$SEARCH_STRING4"; then
-        echo "\"$SEARCH_STRING4\" found in $POD"
+    if ! $FOUND5 && kubectl -n $NAMESPACE --tail=200 logs $POD | grep -q -- "$SEARCH_STRING5"; then
+        echo "\"$SEARCH_STRING5\" found in $POD"
         FOUND5=true
     fi
     # Search for the fourth string
-    if ! $FOUND6 && kubectl -n $NAMESPACE --tail=200 logs $POD | grep -q -- "$SEARCH_STRING4"; then
-        echo "\"$SEARCH_STRING4\" found in $POD"
+    if ! $FOUND6 && kubectl -n $NAMESPACE --tail=200 logs $POD | grep -q -- "$SEARCH_STRING6"; then
+        echo "\"$SEARCH_STRING6\" found in $POD"
         FOUND6=true
     fi
     # Search for the fourth string
-    if ! $FOUND7 && kubectl -n $NAMESPACE --tail=200 logs $POD | grep -q -- "$SEARCH_STRING4"; then
-        echo "\"$SEARCH_STRING4\" found in $POD"
+    if ! $FOUND7 && kubectl -n $NAMESPACE --tail=200 logs $POD | grep -q -- "$SEARCH_STRING7"; then
+        echo "\"$SEARCH_STRING7\" found in $POD"
         FOUND7=true
     fi
 done

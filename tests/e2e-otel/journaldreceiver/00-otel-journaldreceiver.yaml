@@ -37,7 +37,7 @@ metadata:
   namespace: chainsaw-journald
 spec:
   mode: daemonset
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.98.0
+  image: registry.redhat.io/rhosdt/opentelemetry-collector-rhel8@sha256:9522e916f0b0709fd59ea5c6385aa401960b92e084eb14e4ddc56e5a006bc70d
   serviceAccount: privileged-sa
   serviceAccountName: privileged-sa
   securityContext:

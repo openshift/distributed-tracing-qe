@@ -108,6 +108,9 @@ spec:
   serviceAccountName: chainsaw-k8seventsreceiver
   config: |
     receivers:
+      otlp:
+        protocols:
+          http:
       k8s_events:
         namespaces: [chainsaw-k8seventsreceiver]
     exporters:
@@ -117,4 +120,7 @@ spec:
       pipelines:
         logs:
           receivers: [k8s_events]
+          exporters: [debug]
+        traces:
+          receivers: [otlp]
           exporters: [debug]

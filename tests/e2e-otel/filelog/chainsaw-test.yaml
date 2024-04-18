@@ -42,6 +42,12 @@ spec:
         file: 01-app-plaintext-logs.yaml
     - assert:
         file: 01-assert.yaml
+  - name: Wait for the metrics, logs to be collected
+    try:
+    - sleep:
+        duration: 60s
+  - name: Check the collected logs
+    try:
     - script:
         timeout: 5m
         content: ./check_logs.sh

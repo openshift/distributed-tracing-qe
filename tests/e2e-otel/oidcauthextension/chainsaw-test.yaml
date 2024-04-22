@@ -41,6 +41,10 @@ spec:
         file: generate-traces.yaml
     - assert:
         file: generate-traces-assert.yaml
+  - name: Wait for the traces to be collected by OTEL collector
+    try:
+    - sleep:
+        duration: 60s
   - name: Check traces in the OTEL server collector
     try:
     - script:

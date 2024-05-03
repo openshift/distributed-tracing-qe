@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chainsaw-otel-logcollector
+  namespace: openshift-logging
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: chainsaw-otel-logs-writer
+rules:
+- apiGroups:
+  - loki.grafana.com
+  resourceNames:
+  - logs
+  resources:
+  - application
+  - infrastructure
+  verbs:
+  - create
+  - get
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chainsaw-otel-logs-writer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chainsaw-otel-logs-writer
+subjects:
+- kind: ServiceAccount
+  name: chainsaw-otel-logcollector
+  namespace: openshift-logging
+
+---
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: chainsaw-lokiexporter
+  namespace: openshift-logging
+spec:
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.98.0
+  mode: deployment
+  serviceAccount: chainsaw-otel-logcollector
+  serviceAccountName: chainsaw-otel-logcollector
+  env:
+  - name: K8S_NODE_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: spec.nodeName
+  config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+          http:
+
+    processors:
+      resource:
+        attributes:
+        - action: insert
+          key: loki.format
+          value: json
+
+    extensions:
+      bearertokenauth:
+        filename: /var/run/secrets/kubernetes.io/serviceaccount/token
+      file_storage:
+        directory: /file-storage-data
+        timeout: 10s
+    
+    exporters:
+      debug:
+        verbosity: detailed
+      loki:
+        endpoint: https://logging-loki-gateway-http.openshift-logging.svc:8080/api/logs/v1/application/loki/api/v1/push
+        default_labels_enabled:
+          exporter: true
+          job: true
+          instance: true
+          level: true
+        headers:
+          "X-Scope-OrgID": application
+        tls:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          min_version: "1.2"
+          cipher_suites:
+            - TLS_AES_128_GCM_SHA256
+            - TLS_AES_256_GCM_SHA384
+            - TLS_CHACHA20_POLY1305_SHA256
+        auth:
+          authenticator: bearertokenauth
+        sending_queue:
+          storage: file_storage
+
+    service:
+      extensions: [bearertokenauth, file_storage]
+      pipelines:
+        logs:
+          receivers: [otlp]
+          processors: [resource]
+          exporters: [loki,debug]
+  volumeMounts:
+  - name: file-storage-data
+    mountPath: /file-storage-data
+  volumes:
+  - name: file-storage-data
+    emptyDir: {}

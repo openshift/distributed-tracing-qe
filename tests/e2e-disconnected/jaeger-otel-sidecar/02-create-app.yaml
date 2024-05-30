@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kuttl-jaeger-otel-sidecar-app
+
+---
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel
+  namespace: kuttl-jaeger-otel-sidecar-app
+spec:
+  mode: sidecar
+  config: |
+    receivers:
+      jaeger:
+        protocols:
+          grpc:
+          thrift_binary:
+          thrift_compact:
+          thrift_http:
+      opencensus:
+      otlp:
+        protocols:
+          grpc:
+          http:
+      zipkin:
+    processors:
+      batch:
+        # Batching helps better compress the data and reduce the number of outgoing
+        # connections required to transmit the data.
+        # https://github.com/open-telemetry/opentelemetry-collector/blob/main/processor/batchprocessor
+      memory_limiter:
+        # Prevents out of memory situations on the collector
+        # https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/memorylimiterprocessor
+        check_interval: 1s
+        limit_percentage: 50
+        spike_limit_percentage: 30
+    exporters:
+      otlp:
+        endpoint: "cluster-collector-collector.kuttl-jaeger-otel-sidecar.svc:4317"
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        traces:
+          receivers: [jaeger, opencensus, otlp, zipkin]
+          processors: [memory_limiter, batch]
+          exporters: [otlp]
+
+---
+# deploy sample application
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-app
+  namespace: kuttl-jaeger-otel-sidecar-app
+  labels:
+    test: otel
+spec:
+  selector:
+    matchLabels:
+      app: sample-app
+      jaeger-infra: sample-app-pod
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: sample-app
+        jaeger-infra: sample-app-pod
+        test: otel
+      annotations:
+        sidecar.opentelemetry.io/inject: "true"
+    spec:
+      containers:
+      - image: docker.io/jaegertracing/vertx-create-span@sha256:6704312715644554fe4d51e0ce5cb0032e9231653ac61bdbdb5f290cb637d421
+        imagePullPolicy: Always
+        name: sample-app
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-app
+  namespace: kuttl-jaeger-otel-sidecar-app
+  labels:
+    app: sample-app
+    test: otel
+spec:
+  selector:
+    app: sample-app
+  ports:
+  - name: sample-app
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  type: ClusterIP
+
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: sample-app
+  namespace: kuttl-jaeger-otel-sidecar-app
+  labels:
+    jaeger-infra: sample-app-route
+    test: otel
+spec:
+  to:
+    kind: Service
+    name: sample-app

@@ -1,0 +1,4 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+commands:
+- script: ./tests/e2e-acceptance/jaeger-otel-sidecar/check_traces.sh

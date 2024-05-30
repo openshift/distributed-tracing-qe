@@ -1,0 +1,25 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: cluster-collector
+  namespace: kuttl-jaeger-otel-sidecar
+spec:
+  config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc: 
+          http:
+    processors:
+    exporters:
+      otlp:
+        endpoint: jaeger-production-collector-headless.kuttl-jaeger-otel-sidecar.svc:4317
+        tls:
+          ca_file: "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: []
+          exporters: [otlp]
+  mode: deployment

@@ -1,0 +1,74 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel
+spec:
+  mode: deployment
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.92.0
+  observability:
+    metrics:
+      enableMetrics: true
+  config: |
+    connectors:
+      spanmetrics:
+        histogram:
+          explicit:
+            buckets: [2ms, 4ms, 6ms, 8ms, 10ms, 50ms, 100ms, 200ms, 400ms, 800ms, 1s, 1400ms, 2s, 5s, 10s, 15s]
+        dimensions:
+        - name: http.method
+          default: GET
+        - name: http.status_code
+        dimensions_cache_size: 1000
+        aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"    
+        metrics_flush_interval: 5s
+
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+          http:
+    
+    exporters:
+      prometheus:
+        add_metric_suffixes: false
+        endpoint: 0.0.0.0:8889
+        resource_to_telemetry_conversion: 
+          enabled: true # by default resource attributes are dropped
+
+      logging:
+
+      otlp:
+        endpoint: tempo-redmetrics-distributor:4317
+        tls:
+          insecure: true
+    
+    service:
+      # Expose internal telemetry of the collector
+      # It exposes Prometheus /metrics endpoint for internal telemetry
+      telemetry:
+        metrics:
+          address: 0.0.0.0:8888
+      pipelines:
+        traces:
+          receivers: [otlp]
+          exporters: [otlp, spanmetrics]
+        metrics:
+          receivers: [spanmetrics]
+          exporters: [prometheus, logging]
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: span-red
+spec:
+  groups:
+  - name: server-side-latency
+    rules:
+    - alert: SpanREDFrontendAPIRequestLatency
+      expr: histogram_quantile(0.95, sum(rate(duration_bucket{service_name="frontend", span_kind="SPAN_KIND_SERVER"}[1m])) by (le, service_name, span_name)) > 1000
+      labels:
+        severity: Warning
+      annotations:
+        summary: "High request latency on {{$labels.service_name}} and {{$labels.span_name}}"
+        description: "{{$labels.instance}} has 95th request latency above 2s (current value: {{$value}}s)"

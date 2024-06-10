@@ -6,7 +6,7 @@ status:
   phase: Active
 
 ---
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   labels:
@@ -14,51 +14,46 @@ metadata:
   name: otel
   namespace: kuttl-jaeger-otel-sidecar-app
 spec:
-  config: |
-    receivers:
-      jaeger:
-        protocols:
-          grpc:
-          thrift_binary:
-          thrift_compact:
-          thrift_http:
-      opencensus:
+  config:
+    exporters:
       otlp:
-        protocols:
-          grpc:
-          http:
-      zipkin:
+        endpoint: cluster-collector-collector.kuttl-jaeger-otel-sidecar.svc:4317
+        tls:
+          insecure: true
     processors:
-      batch:
-        # Batching helps better compress the data and reduce the number of outgoing
-        # connections required to transmit the data.
-        # https://github.com/open-telemetry/opentelemetry-collector/blob/main/processor/batchprocessor
+      batch: null
       memory_limiter:
-        # Prevents out of memory situations on the collector
-        # https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/memorylimiterprocessor
         check_interval: 1s
         limit_percentage: 50
         spike_limit_percentage: 30
-    exporters:
+    receivers:
+      jaeger:
+        protocols:
+          grpc: null
+          thrift_binary: null
+          thrift_compact: null
+          thrift_http: null
+      opencensus: null
       otlp:
-        endpoint: "cluster-collector-collector.kuttl-jaeger-otel-sidecar.svc:4317"
-        tls:
-          insecure: true
+        protocols:
+          grpc: null
+          http: null
+      zipkin: null
     service:
       pipelines:
         traces:
-          receivers: [jaeger, opencensus, otlp, zipkin]
-          processors: [memory_limiter, batch]
-          exporters: [otlp]
-  ingress:
-    route: {}
+          exporters:
+          - otlp
+          processors:
+          - memory_limiter
+          - batch
+          receivers:
+          - jaeger
+          - opencensus
+          - otlp
+          - zipkin
+  managementState: managed
   mode: sidecar
-  replicas: 1
-  resources: {}
-  targetAllocator:
-    prometheusCR: {}
-    resources: {}
-  upgradeStrategy: automatic
 
 ---
 apiVersion: apps/v1

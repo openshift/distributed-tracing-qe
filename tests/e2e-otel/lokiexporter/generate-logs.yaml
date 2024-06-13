@@ -1,0 +1,18 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: generate-logs
+  namespace: openshift-logging
+spec:
+  template:
+    spec:
+      containers:
+      - name: telemetrygen
+        image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.92.0
+        args:
+        - logs
+        - --otlp-endpoint=chainsaw-lokiexporter-collector:4317
+        - --logs=20
+        - --otlp-insecure=true
+        - '--body="{\"message\": \"MERGE_JSON_LOG=true\", \"level\": \"debug\",\"Layer1\": \"layer1 0\", \"layer2\": {\"name\":\"Layer2 1\", \"tips\":\"Decide by PRESERVE_JSON_LOG\"}, \"StringNumber\":\"10\", \"Number\": 10,\"foo.bar\":\"Dot Item\",\"{foobar}\":\"Brace Item\",\"[foobar]\":\"Bracket Item\", \"foo:bar\":\"Colon Item\",\"foo bar\":\"Space Item\"}"'
+      restartPolicy: Never

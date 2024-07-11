@@ -1,0 +1,157 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tempo-blue
+  namespace: chainsaw-routecnctr
+status:
+  availableReplicas: 1
+  readyReplicas: 1
+  replicas: 1
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tempo-red
+  namespace: chainsaw-routecnctr
+status:
+  availableReplicas: 1
+  readyReplicas: 1
+  replicas: 1
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tempo-green
+  namespace: chainsaw-routecnctr
+status:
+  availableReplicas: 1
+  readyReplicas: 1
+  replicas: 1
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tempo-blue-0
+  namespace: chainsaw-routecnctr
+status:
+  containerStatuses:
+  - name: tempo
+    ready: true
+    started: true
+  - name: tempo-query
+    ready: true
+    started: true
+  phase: Running
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tempo-green-0
+  namespace: chainsaw-routecnctr
+status:
+  containerStatuses:
+  - name: tempo
+    ready: true
+    started: true
+  - name: tempo-query
+    ready: true
+    started: true
+  phase: Running
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tempo-red-0
+  namespace: chainsaw-routecnctr
+status:
+  containerStatuses:
+  - name: tempo
+    ready: true
+    started: true
+  - name: tempo-query
+    ready: true
+    started: true
+  phase: Running
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo-blue-jaegerui
+  namespace: chainsaw-routecnctr
+spec:
+  ports:
+  - name: jaeger-grpc
+    port: 16685
+    protocol: TCP
+    targetPort: jaeger-grpc
+  - name: jaeger-ui
+    port: 16686
+    protocol: TCP
+    targetPort: jaeger-ui
+  - name: jaeger-metrics
+    port: 16687
+    protocol: TCP
+    targetPort: jaeger-metrics
+  selector:
+    app.kubernetes.io/component: tempo
+    app.kubernetes.io/instance: blue
+    app.kubernetes.io/managed-by: tempo-operator
+    app.kubernetes.io/name: tempo-monolithic
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo-green-jaegerui
+  namespace: chainsaw-routecnctr
+spec:
+  ports:
+  - name: jaeger-grpc
+    port: 16685
+    protocol: TCP
+    targetPort: jaeger-grpc
+  - name: jaeger-ui
+    port: 16686
+    protocol: TCP
+    targetPort: jaeger-ui
+  - name: jaeger-metrics
+    port: 16687
+    protocol: TCP
+    targetPort: jaeger-metrics
+  selector:
+    app.kubernetes.io/component: tempo
+    app.kubernetes.io/instance: green
+    app.kubernetes.io/managed-by: tempo-operator
+    app.kubernetes.io/name: tempo-monolithic
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo-red-jaegerui
+  namespace: chainsaw-routecnctr
+spec:
+  ports:
+  - name: jaeger-grpc
+    port: 16685
+    protocol: TCP
+    targetPort: jaeger-grpc
+  - name: jaeger-ui
+    port: 16686
+    protocol: TCP
+    targetPort: jaeger-ui
+  - name: jaeger-metrics
+    port: 16687
+    protocol: TCP
+    targetPort: jaeger-metrics
+  selector:
+    app.kubernetes.io/component: tempo
+    app.kubernetes.io/instance: red
+    app.kubernetes.io/managed-by: tempo-operator
+    app.kubernetes.io/name: tempo-monolithic

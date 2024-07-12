@@ -27,7 +27,8 @@ cat > "$trust_rel_file" <<EOF
       "Condition": {
         "StringEquals": {
           "${oidc_provider}:sub": [
-            "system:serviceaccount:${tempostack_ns}:tempo-${tempostack_name}"
+            "system:serviceaccount:${tempostack_ns}:tempo-${tempostack_name}",
+            "system:serviceaccount:${tempostack_ns}:tempo-${tempostack_name}-query-frontend"
          ]
        }
      }

@@ -1,0 +1,32 @@
+apiVersion: tempo.grafana.com/v1alpha1
+kind: TempoStack
+metadata:
+  name: tempostack
+  namespace: test-perfscale
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/infra: ""
+  observability:
+    metrics:
+      createPrometheusRules: true
+      createServiceMonitors: true
+  resources:
+    total:
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+  template:
+    queryFrontend:
+      component:
+        resources:
+          limits:
+            cpu: "2"
+            memory: 2Gi
+      jaegerQuery:
+        enabled: true
+  storage:
+    secret:
+      type: s3
+      name: s3-secret
+  storageSize: 10Gi
+

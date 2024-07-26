@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: generate-traces
+  namespace: test-perfscale
+spec:
+  completions: 200
+  parallelism: 50
+  template:
+    spec:
+      # nodeSelector:
+        # node-role.kubernetes.io/workload: ""
+      containers:
+      - name: telemetrygen
+        image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.98.0
+        args:
+        - traces
+        - --otlp-endpoint=tempo-tempostack-distributor.test-perfscale.svc:4317
+        # - --otlp-endpoint=dev-collector:4317
+        - --otlp-insecure
+        - --duration=20s
+        - --workers=5
+        # - --span-duration=1s
+        - --child-spans=50
+        # - --rate=%RATE_NUMBER%
+        # - --traces=5000
+      restartPolicy: Never

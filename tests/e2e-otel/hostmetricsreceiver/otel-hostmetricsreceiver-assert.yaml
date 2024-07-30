@@ -1,8 +1,8 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: otel-hostmetricsreceiver-collector
-  namespace: chainsaw-hostmetricsreceiver
+  name: otel-hstmtrs-collector
+  namespace: chainsaw-hostmetrics
 spec:
   updateStrategy:
     rollingUpdate:
@@ -17,8 +17,8 @@ status:
 apiVersion: v1
 kind: Service
 metadata:
-  name: otel-hostmetricsreceiver-collector-monitoring
-  namespace: chainsaw-hostmetricsreceiver
+  name: otel-hstmtrs-collector-monitoring
+  namespace: chainsaw-hostmetrics
 spec:
   ports:
   - name: monitoring
@@ -27,6 +27,6 @@ spec:
     targetPort: 8888
   selector:
     app.kubernetes.io/component: opentelemetry-collector
-    app.kubernetes.io/instance: chainsaw-hostmetricsreceiver.otel-hostmetricsreceiver
+    app.kubernetes.io/instance: chainsaw-hostmetrics.otel-hstmtrs
     app.kubernetes.io/managed-by: opentelemetry-operator
     app.kubernetes.io/part-of: opentelemetry

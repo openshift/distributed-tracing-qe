@@ -3,7 +3,7 @@
 
 # Define the label selector
 LABEL_SELECTOR="app.kubernetes.io/component=opentelemetry-collector"
-NAMESPACE=chainsaw-hostmetricsreceiver
+NAMESPACE=chainsaw-hostmetrics
 
 # Define the search strings
 SEARCH_STRING1='process.pid'

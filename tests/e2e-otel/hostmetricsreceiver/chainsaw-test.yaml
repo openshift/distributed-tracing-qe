@@ -3,6 +3,7 @@ kind: Test
 metadata:
   name: hostmetricsreceiver
 spec:
+  namespace: chainsaw-hostmetrics
   steps:
   - name: Create OTEL collector with hostmetricsreceiver receiver
     try:

@@ -1,10 +1,6 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  annotations:
-    prometheus.io/path: /metrics
-    prometheus.io/port: "8888"
-    prometheus.io/scrape: "true"
   labels:
     app.kubernetes.io/component: opentelemetry-collector
     app.kubernetes.io/instance: chainsaw-journald.otel-joural-logs

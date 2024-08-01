@@ -29,6 +29,12 @@ function is_pod_ready {
   echo $ready
 }
 
+### Untaint Infra node
+log_task "UnTaint infra node"
+for node in $(oc get nodes | grep infra | cut -f 1 -d ' '); do
+  oc adm taint nodes $node node-role.kubernetes.io/infra-
+done
+
 ### NAMESPACE ###
 log_task "CREATING NAMESPACE"
 oc create -f ./content/01-namespace.yaml
@@ -125,3 +131,8 @@ done
 log_task "ClusterRoleBinding"
 oc create -f ./content/04-clusterrolebinding.yaml
 
+### Taint infra node
+log_task "Taint infra node"
+for node in $(oc get nodes | grep infra | cut -f 1 -d ' '); do
+  oc adm taint nodes $node node-role.kubernetes.io/infra=reserved:NoSchedule
+done

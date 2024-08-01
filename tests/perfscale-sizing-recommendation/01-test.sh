@@ -1,7 +1,7 @@
 #!/bin/bash
 
-rate=5000
+rate=1000
 
-oc delete job generate-traces -n test-perfscale
+oc delete job generate-traces -n test-generate-traces
 
 cat ./content/05-generate-traces.yaml | sed "s/%RATE_NUMBER%/$rate/g" | oc create -f -

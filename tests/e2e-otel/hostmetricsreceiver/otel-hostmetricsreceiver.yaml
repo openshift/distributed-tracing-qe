@@ -44,7 +44,7 @@ metadata:
   name: otel-hstmtrs
 spec:
   mode: daemonset
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.98.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.103.1
   serviceAccount: otel-hostfs-daemonset
   serviceAccountName: otel-hostfs-daemonset
   config: |

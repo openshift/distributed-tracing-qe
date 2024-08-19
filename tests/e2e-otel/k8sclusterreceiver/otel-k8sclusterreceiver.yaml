@@ -103,7 +103,7 @@ metadata:
   namespace: chainsaw-k8sclusterreceiver
 spec:
   mode: deployment
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.98.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.103.1
   serviceAccount: chainsaw-k8sclusterreceiver
   serviceAccountName: chainsaw-k8sclusterreceiver
   config: |

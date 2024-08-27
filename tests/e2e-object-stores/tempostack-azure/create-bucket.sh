@@ -4,9 +4,18 @@ set -e
 
 AZURE_RESOURCE_GROUP_NAME=ikanse-tempostack-azure
 AZURE_RESOURCE_GROUP_LOCATION=eastus
-AZURE_STORAGE_AZURE_ACCOUNTNAME="ikansest"
+AZURE_STORAGE_AZURE_ACCOUNTNAME="ikansetempo"
 SECRETNAME="azure-secret"
 AZURE_ENV="AzureGlobal"
+
+# Check if the storage account exists before attempting to delete it.
+if az storage account show --name "$AZURE_STORAGE_AZURE_ACCOUNTNAME" --resource-group "$AZURE_RESOURCE_GROUP_NAME" &>/dev/null; then
+    # Delete the storage account
+    az storage account delete --name "$AZURE_STORAGE_AZURE_ACCOUNTNAME" --resource-group "$AZURE_RESOURCE_GROUP_NAME" --yes
+    echo "Storage account '$AZURE_STORAGE_AZURE_ACCOUNTNAME' deleted successfully."
+else
+    echo "Storage account '$AZURE_STORAGE_AZURE_ACCOUNTNAME' does not exist."
+fi
 
 # Check if the resource group exists before attempting to delete it.
 if [ "$(az group exists --name $AZURE_RESOURCE_GROUP_NAME)" == "true" ]; then

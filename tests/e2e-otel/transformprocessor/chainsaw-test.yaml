@@ -11,6 +11,11 @@ spec:
         file: install-tempo.yaml
     - assert:
         file: install-tempo-assert.yaml
+  - name: Check the status of Tempo Monolithc instance tprocssr
+    try:
+    - script:
+        timeout: 5m
+        content: kubectl get --namespace chainsaw-tprocssr tempomonolithics tprocssr -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
   - name: Create OTEL collector instance
     try:
     - apply:

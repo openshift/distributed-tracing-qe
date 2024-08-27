@@ -14,6 +14,8 @@ metadata:
   name: otel
   namespace: kuttl-jaeger-otel-sidecar-app
 spec:
+  args:
+    feature-gates: -component.UseLocalHostAsDefaultHost
   config:
     exporters:
       otlp:
@@ -52,16 +54,17 @@ spec:
           - opencensus
           - otlp
           - zipkin
+  configVersions: 3
   daemonSetUpdateStrategy: {}
   deploymentUpdateStrategy: {}
   ingress:
     route: {}
+  ipFamilyPolicy: SingleStack
   managementState: managed
   mode: sidecar
   observability:
     metrics: {}
-  podDisruptionBudget:
-    maxUnavailable: 1
+  podDnsConfig: {}
   replicas: 1
   resources: {}
   targetAllocator:
@@ -75,6 +78,7 @@ spec:
       serviceMonitorSelector: {}
     resources: {}
   upgradeStrategy: automatic
+
 ---
 apiVersion: apps/v1
 kind: Deployment

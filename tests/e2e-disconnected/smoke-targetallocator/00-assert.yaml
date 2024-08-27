@@ -33,16 +33,15 @@ data:
             config: {}
             target_allocator:
                 collector_id: ${POD_NAME}
-                endpoint: http://stateful-targetallocator:80
+                endpoint: http://stateful-targetallocator.chainsaw-smoke-targetallocator.svc.cluster.local:80
                 interval: 30s
     service:
         pipelines:
             traces:
                 exporters:
                     - debug
-                processors: []
                 receivers:
                     - jaeger
 kind: ConfigMap
 metadata:
-  name: stateful-collector-fb278632
+  name: stateful-collector-2687b61c

@@ -154,7 +154,8 @@ spec:
         - --traces.tenant-header=x-scope-orgid
         - --web.listen=0.0.0.0:8080
         - --web.internal.listen=0.0.0.0:8081
-        - --traces.write.endpoint=tempo-simplest-distributor.chainsaw-multitenancy.svc.cluster.local:4317
+        - --traces.write.otlpgrpc.endpoint=tempo-simplest-distributor.chainsaw-multitenancy.svc.cluster.local:4317
+        - --traces.write.otlphttp.endpoint=https://tempo-simplest-distributor.chainsaw-multitenancy.svc.cluster.local:4318
         - --traces.tempo.endpoint=https://tempo-simplest-query-frontend.chainsaw-multitenancy.svc.cluster.local:3200
         - --grpc.listen=0.0.0.0:8090
         - --rbac.config=/etc/tempo-gateway/cm/rbac.yaml
@@ -165,11 +166,13 @@ spec:
         - --traces.tls.key-file=/var/run/tls/server/tls.key
         - --traces.tls.cert-file=/var/run/tls/server/tls.crt
         - --traces.tls.ca-file=/var/run/ca/service-ca.crt
+        - --traces.tls.watch-certs=true
         - --tls.server.cert-file=/etc/tempo-gateway/serving-certs/tls.crt
         - --tls.server.key-file=/etc/tempo-gateway/serving-certs/tls.key
         - --tls.healthchecks.server-ca-file=/etc/tempo-gateway/cabundle/service-ca.crt
         - --tls.healthchecks.server-name=tempo-simplest-gateway.chainsaw-multitenancy.svc.cluster.local
         - --web.healthchecks.url=https://localhost:8080
+        - --tls.client-auth-type=NoClientCert
         - --traces.read.endpoint=https://tempo-simplest-query-frontend.chainsaw-multitenancy.svc.cluster.local:16686
         livenessProbe:
           failureThreshold: 10

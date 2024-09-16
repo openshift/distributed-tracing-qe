@@ -1,0 +1,34 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: otlpjsonfile
+spec:
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.107.0
+  config: |
+    receivers:
+      otlpjsonfile:
+        include:
+          - "/telemetry-data/*.json"
+
+    processors:
+
+    exporters:
+      debug:
+      otlp:
+        endpoint: tempo-jsonrecv:4317
+        tls:
+          insecure: true
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlpjsonfile]
+          processors: []
+          exporters: [debug,otlp]
+  volumes:
+    - name: file
+      persistentVolumeClaim:
+        claimName: otlp-data
+  volumeMounts: 
+    - name: file
+      mountPath: /telemetry-data

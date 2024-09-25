@@ -11,14 +11,21 @@ spec:
       nodeSelector:
         node-role.kubernetes.io/worker: ""
       containers:
-      - name: telemetrygen
-        image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.98.0
+      - name: loadgen
+        image: ghcr.io/honeycombio/loadgen/loadgen:latest
         args:
-        - traces
-        - --otlp-endpoint=tempo-tempostack-distributor.test-perfscale.svc:4317
-        - --otlp-insecure
-        - --duration=70m
-        - --workers=50
-        - --child-spans=50
-        - --rate=%RATE_NUMBER%
+        - --dataset=loadtest
+        - --tps=%RATE_NUMBER%
+        - --depth=50
+        - --nspans=50
+        - --runtime=%RUN_TIME%
+        - --ramptime=1s
+        - --tracecount=%TRACE_COUNT%
+        - --protocol=grpc
+        - --sender=otel
+        - --host=tempo-tempostack-distributor.test-perfscale:4317
+        - --loglevel=info
+        - --insecure
       restartPolicy: Never
+  backoffLimit: 4
+

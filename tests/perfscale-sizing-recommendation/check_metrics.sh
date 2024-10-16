@@ -14,7 +14,7 @@ query="$metric"
 count=0
     response=$(curl -s -k -H "Authorization: Bearer $TOKEN" -H "Content-type: application/json" "https://$THANOS_QUERIER_HOST/api/v1/query?query=$query")
     time=$(echo "$response" | jq -r '.data.result[0].value[0]')
-    count=$(echo "$response" | jq -r '.data.result[0].value[1]')
+    count=$(echo "$response" | jq -r '[.data.result[].value[1] | tonumber] | add')
     echo "$time;$count" >> $metric.log
     echo "Metric: $metric: $count"
 done

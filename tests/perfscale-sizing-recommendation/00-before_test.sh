@@ -9,8 +9,6 @@
 # set -o errexit
 # set -o pipefail
 
-sizing="${1:-'small'}"
-
 sleep_time=30
 r=10 # Number of repeats
 
@@ -100,25 +98,7 @@ done
 
 ### PREPARE TEMPOSTACK ###
 log_task "TempoStack"
-case $sizing in
-  small)
-     oc create -f ./content/03-tempostack_small.yaml
-     ;;
-
-  medium)
-    oc create -f ./content/03-tempostack_medium.yaml
-    ;;
-
-  heavy)
-    oc create -f ./content/03-tempostack_heavy.yaml
-    ;;
-
-  *)
-    echo "!! Unknown parameter. Please use small/medium/heavy !!"
-    echo "!! Run 'bash 02-after_test_cleaning.sh' to clean leftovers"
-    exit 1
-    ;;
-esac
+oc create -f ./content/03-tempostack.yaml
 sleep 5
 
 for i in $(seq $r)

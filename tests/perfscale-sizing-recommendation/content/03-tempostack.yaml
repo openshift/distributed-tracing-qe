@@ -10,11 +10,6 @@ spec:
     metrics:
       createPrometheusRules: true
       createServiceMonitors: true
-  resources:
-    total:
-      limits:
-        cpu: 16000m
-        memory: 16Gi
   template:
     queryFrontend:
       component:

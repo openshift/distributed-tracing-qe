@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: generate-traces
+  namespace: test-perfscale
+spec:
+  completions: 1
+  parallelism: 1
+  template:
+    spec:
+      containers:
+      - name: loadgen
+        image: ghcr.io/honeycombio/loadgen/loadgen:latest
+        args:
+        - --dataset=grpc
+        - --tps=10
+        - --depth=50
+        - --nspans=50
+        - --runtime=300s
+        - --ramptime=1s
+        - --tracecount=3000
+        - --protocol=grpc
+        - --sender=otel
+        - --host=dev-collector:4317
+        - --loglevel=info
+        - --insecure
+      restartPolicy: Never
+  backoffLimit: 4

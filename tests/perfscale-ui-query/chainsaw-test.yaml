@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: perfscale-ui-query
+spec:
+  timeouts:
+    cleanup: 90s
+  namespace: test-perfscale
+  steps:
+  - name: step-00
+    try:
+    - apply:
+        file: 00-install-storage.yaml
+    - assert:
+        file: 00-assert.yaml
+  - name: step-01
+    try:
+    - apply:
+        file: 01-install-tempo.yaml
+    - assert:
+        timeout: 5m
+        file: 01-assert.yaml
+  - name: step-02
+    try:
+    - apply:
+        file: 02-install-otelcol.yaml
+    - assert:
+        file: 02-assert.yaml
+  - name: step-03
+    try:
+    - apply:
+        file: 03-generate-traces.yaml
+    - assert:
+        timeout: 7m
+        file: 03-assert.yaml
+  - name: step-05
+    try:
+    - script:
+        timeout: 10h
+        content: ./04-check-ui-query.sh

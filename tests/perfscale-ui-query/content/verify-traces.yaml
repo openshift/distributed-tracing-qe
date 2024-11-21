@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: verify-traces
+  namespace: test-perfscale
+spec:
+  template:
+    spec:
+      containers:
+      - name: verify-traces
+        image: ghcr.io/grafana/tempo-operator/test-utils:main
+        command:
+        - /bin/bash
+        - -eux
+        - -c
+        args:
+        - |
+          token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+          curl \
+            -w "\nTIME_TOTAL: %{time_total}" \
+            -v -G \
+            --header "Authorization: Bearer $token" \
+            --cacert /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt \
+            https://tempo-simplest-gateway.test-perfscale.svc:8080/api/traces/v1/dev/api/traces \
+            --data-urlencode "end=%END%" \
+            --data-urlencode "limit=%LIMIT%" \
+            --data-urlencode "lookback=1" \
+            --data-urlencode "maxDuration" \
+            --data-urlencode "minDuration" \
+            --data-urlencode "service=grpc" \
+            --data-urlencode "start=%START%"
+      restartPolicy: Never

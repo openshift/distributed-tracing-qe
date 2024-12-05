@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
       - name: telemetrygen
-        image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen@sha256:a036b2ec403f445adc68bfcc359d5040a6603af4081a76a6cf02a5de55138a4e
+        image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest@sha256:d16e57246f71cb0b94390226bae23bb5b55d6a0fa5b0d067edf6e370a12e9799
         args:
         - traces
         - --otlp-endpoint=dev-collector:4317
@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
         - name: telemetrygen
-          image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen@sha256:a036b2ec403f445adc68bfcc359d5040a6603af4081a76a6cf02a5de55138a4e
+          image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest@sha256:d16e57246f71cb0b94390226bae23bb5b55d6a0fa5b0d067edf6e370a12e9799
           args:
             - traces
             - --otlp-endpoint=dev-collector:4318

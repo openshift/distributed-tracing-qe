@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
       - name: verify-traces
-        image: ghcr.io/grafana/tempo-operator/test-utils@sha256:7cf76bad82feb2cc338d23b29d7585c9399dfc8105bbab0c0636a776916aa3bc
+        image: ghcr.io/grafana/tempo-operator/test-utils:main@sha256:abe652bdd34f9433b5bbe0e8100838b154f69b51aec0a9cc04fe381eef7bec84
         command:
         - /bin/bash
         - -eux
@@ -41,7 +41,7 @@ spec:
     spec:
       containers:
         - name: verify-traces
-          image: ghcr.io/grafana/tempo-operator/test-utils@sha256:7cf76bad82feb2cc338d23b29d7585c9399dfc8105bbab0c0636a776916aa3bc
+          image: ghcr.io/grafana/tempo-operator/test-utils:main@sha256:abe652bdd34f9433b5bbe0e8100838b154f69b51aec0a9cc04fe381eef7bec84
           command:
             - /bin/bash
             - -eux
@@ -73,7 +73,7 @@ spec:
     spec:
       containers:
         - name: verify-traces
-          image: ghcr.io/grafana/tempo-operator/test-utils@sha256:7cf76bad82feb2cc338d23b29d7585c9399dfc8105bbab0c0636a776916aa3bc
+          image: ghcr.io/grafana/tempo-operator/test-utils:main@sha256:abe652bdd34f9433b5bbe0e8100838b154f69b51aec0a9cc04fe381eef7bec84
           command:
             - /bin/bash
             - -eux
@@ -106,7 +106,7 @@ spec:
     spec:
       containers:
         - name: verify-traces
-          image: ghcr.io/grafana/tempo-operator/test-utils@sha256:7cf76bad82feb2cc338d23b29d7585c9399dfc8105bbab0c0636a776916aa3bc
+          image: ghcr.io/grafana/tempo-operator/test-utils:main@sha256:abe652bdd34f9433b5bbe0e8100838b154f69b51aec0a9cc04fe381eef7bec84
           command:
             - /bin/bash
             - -eux

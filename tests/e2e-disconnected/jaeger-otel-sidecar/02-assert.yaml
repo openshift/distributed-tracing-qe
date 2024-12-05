@@ -9,13 +9,9 @@ status:
 apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
-  labels:
-    app.kubernetes.io/managed-by: opentelemetry-operator
   name: otel
   namespace: kuttl-jaeger-otel-sidecar-app
 spec:
-  args:
-    feature-gates: -component.UseLocalHostAsDefaultHost
   config:
     exporters:
       otlp:
@@ -31,16 +27,24 @@ spec:
     receivers:
       jaeger:
         protocols:
-          grpc: null
-          thrift_binary: null
-          thrift_compact: null
-          thrift_http: null
-      opencensus: null
+          grpc:
+            endpoint: 0.0.0.0:14250
+          thrift_binary:
+            endpoint: 0.0.0.0:6832
+          thrift_compact:
+            endpoint: 0.0.0.0:6831
+          thrift_http:
+            endpoint: 0.0.0.0:14268
+      opencensus:
+        endpoint: 0.0.0.0:55678
       otlp:
         protocols:
-          grpc: null
-          http: null
-      zipkin: null
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+      zipkin:
+        endpoint: 0.0.0.0:9411
     service:
       pipelines:
         traces:
@@ -54,31 +58,9 @@ spec:
           - opencensus
           - otlp
           - zipkin
-  configVersions: 3
-  daemonSetUpdateStrategy: {}
-  deploymentUpdateStrategy: {}
-  ingress:
-    route: {}
-  ipFamilyPolicy: SingleStack
-  managementState: managed
-  mode: sidecar
-  observability:
-    metrics: {}
-  podDnsConfig: {}
-  replicas: 1
-  resources: {}
-  targetAllocator:
-    allocationStrategy: consistent-hashing
-    filterStrategy: relabel-config
-    observability:
-      metrics: {}
-    prometheusCR:
-      podMonitorSelector: {}
-      scrapeInterval: 30s
-      serviceMonitorSelector: {}
-    resources: {}
-  upgradeStrategy: automatic
-
+      telemetry:
+        metrics:
+          address: 0.0.0.0:8888
 ---
 apiVersion: apps/v1
 kind: Deployment

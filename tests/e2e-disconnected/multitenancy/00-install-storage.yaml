@@ -46,7 +46,7 @@ spec:
               value: tempo
             - name: MINIO_SECRET_KEY
               value: supersecret
-          image: quay.io/minio/minio@sha256:7586fd4e11b48d7e41efdc6898b73147231da847cd0d4383d0a718ad2c98e6d8
+          image: quay.io/minio/minio@sha256:dfc084fde47cbddece19c0616c280ea23c07f7d306dbbb135688c6ab60c6885c
           name: minio
           ports:
             - containerPort: 9000

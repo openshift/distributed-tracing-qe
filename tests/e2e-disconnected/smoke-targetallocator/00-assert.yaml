@@ -28,12 +28,20 @@ data:
     receivers:
         jaeger:
             protocols:
-                grpc: null
+                grpc:
+                    endpoint: 0.0.0.0:14250
         prometheus:
-            config: {}
+            config:
+                global:
+                    scrape_interval: 30s
+                    scrape_protocols:
+                        - PrometheusProto
+                        - OpenMetricsText1.0.0
+                        - OpenMetricsText0.0.1
+                        - PrometheusText0.0.4
             target_allocator:
                 collector_id: ${POD_NAME}
-                endpoint: http://stateful-targetallocator.chainsaw-smoke-targetallocator.svc.cluster.local:80
+                endpoint: http://stateful-targetallocator:80
                 interval: 30s
     service:
         pipelines:
@@ -42,6 +50,9 @@ data:
                     - debug
                 receivers:
                     - jaeger
+        telemetry:
+            metrics:
+                address: 0.0.0.0:8888
 kind: ConfigMap
 metadata:
-  name: stateful-collector-2687b61c
+  name: stateful-collector-7a42612e

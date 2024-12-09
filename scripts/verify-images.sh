@@ -67,7 +67,7 @@ echo "*Tempo image Details*"
 echo
 
 tempo_images=$(oc get deployment tempo-operator-controller -n openshift-tempo-operator -o yaml | grep -o "registry.redhat.io/rhosdt/.*" | sed 's/registry.redhat.io/registry.stage.redhat.io/' | sort | uniq)
-[ $(echo "$tempo_images" | wc -l) -eq 5 ] || exit_error "Expected 5 images, found:\n$tempo_images"
+[ $(echo "$tempo_images" | wc -l) -eq 6 ] || exit_error "Expected 5 images, found:\n$tempo_images"
 
 echo "{noformat}"
 for image in $tempo_images; do
@@ -77,7 +77,7 @@ for image in $tempo_images; do
 
     if [[ $image == *tempo-rhel8@* ]]; then
       log_cmd podman run --rm $image --version
-    elif [[ $image == *tempo-gateway-rhel8* || $image == *tempo-gateway-opa-rhel8* ]]; then
+    elif [[ $image == *tempo-gateway-rhel8* || $image == *tempo-gateway-opa-rhel8* || $image == *tempo-query-rhel8* ]]; then
       echo "SKIPPED: $image doesn't have a version command"
     else
       log_cmd podman run --rm $image version

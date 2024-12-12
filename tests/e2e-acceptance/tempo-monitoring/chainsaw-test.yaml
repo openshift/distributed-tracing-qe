@@ -3,16 +3,16 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   creationTimestamp: null
-  name: otlp-metrics-traces
+  name: monitoring
 spec:
   # Avoid running this test case in parallel to prevent the deletion of shared resources used by multiple tests, specifically in the context of OpenShift user workload monitoring.
   concurrent: false
-  namespace: chainsaw-otlp-metrics
+  namespace: chainsaw-monitoring
   steps:
   - name: step-00
     try:
     - apply:
-        file: 00-install-jaeger.yaml
+        file: 00-install-storage.yaml
     - assert:
         file: 00-assert.yaml
   - name: step-01
@@ -24,20 +24,21 @@ spec:
   - name: step-02
     try:
     - apply:
-        file: 02-otel-metrics-collector.yaml
+        file: 02-install-tempostack.yaml
     - assert:
         file: 02-assert.yaml
   - name: step-03
     try:
     - apply:
-        file: 03-metrics-traces-gen.yaml
+        file: 03-generate-traces.yaml
     - assert:
         file: 03-assert.yaml
   - name: step-04
     try:
-    - script:
-        timeout: 5m
-        content: ./check_traces.sh
+    - apply:
+        file: 04-verify-traces.yaml
+    - assert:
+        file: 04-assert.yaml
   - name: step-05
     try:
     - script:

@@ -1,6 +1,6 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: verify-metrics
+  name: telemetrygen-traces
 status:
-  succeeded: 1
+  active: 1

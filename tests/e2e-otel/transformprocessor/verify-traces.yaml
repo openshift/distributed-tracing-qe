@@ -28,8 +28,7 @@ spec:
             (
               .processes[] | 
               (
-                (.tags[] | select(.key == "X-Tenant" and .value == "blue")) and 
-                (.tags[] | select(.key == "otel.library.name" and .value == "telemetrygen"))
+                (.tags[] | select(.key == "X-Tenant" and .value == "blue"))
               )
             )
           ')

@@ -64,14 +64,14 @@ spec:
           process:
     processors:
     exporters:
-      logging:
+      debug:
         verbosity: detailed
     service:
       pipelines:
         metrics:
           receivers: [hostmetrics]
           processors: []
-          exporters: [logging]
+          exporters: [debug]
   volumeMounts:
   - name: hostfs
     mountPath: /hostfs

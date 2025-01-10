@@ -64,14 +64,14 @@ spec:
         files: /var/log/journal/*/*
     processors:
     exporters:
-      logging:
+      debug:
         verbosity: detailed
     service:
       pipelines:
         logs:
           receivers: [journald]
           processors: []
-          exporters: [logging]
+          exporters: [debug]
   volumeMounts:
   - name: journal-logs
     mountPath: /var/log/journal/

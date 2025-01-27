@@ -105,7 +105,6 @@ spec:
   mode: deployment
   image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.103.1
   serviceAccount: chainsaw-k8seventsreceiver
-  serviceAccountName: chainsaw-k8seventsreceiver
   config: |
     receivers:
       otlp:

@@ -36,24 +36,23 @@ spec:
               - key: telemetrygentype
                 default_value: unspecified_environment
     exporters:
+      debug: {}
       prometheus:
         endpoint: 0.0.0.0:8889
         resource_to_telemetry_conversion:
-          enabled: true
-      debug:
-        verbosity: detailed
+          enabled: true # by default resource attributes are dropped
     service:
       pipelines:
         traces:
           receivers: [otlp]
-          exporters: [count,debug]
+          exporters: [count]
         metrics:
           receivers: [otlp]
-          exporters: [count,debug]
+          exporters: [count]
         logs:
           receivers: [otlp]
-          exporters: [count,debug]
+          exporters: [count]
         metrics/count:
           receivers: [count]
-          exporters: [prometheus]
+          exporters: [prometheus, debug]
 

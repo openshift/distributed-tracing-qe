@@ -39,7 +39,6 @@ spec:
   mode: daemonset
   image: registry.redhat.io/rhosdt/opentelemetry-collector-rhel8@sha256:28d5e9ff7406f0ca4753e3a9f390e8a86580c66e38957d033611ce56e76ca36e
   serviceAccount: privileged-sa
-  serviceAccountName: privileged-sa
   securityContext:
     allowPrivilegeEscalation: false
     capabilities:

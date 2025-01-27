@@ -46,7 +46,6 @@ spec:
   progressDeadlineSeconds: 600
   revisionHistoryLimit: 10
   replicas: 1
-  serviceAccountName: prometheus
   selector:
     matchLabels:
       app: prometheus-receiver

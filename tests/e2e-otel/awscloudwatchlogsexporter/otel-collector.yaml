@@ -1,0 +1,42 @@
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: cwlogs
+spec:
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.117.0
+  env:
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: aws-credentials
+          key: access_key_id
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: aws-credentials
+          key: secret_access_key
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc: {}
+          http: {}
+
+    exporters:
+      awscloudwatchlogs:
+        log_group_name: ($log_group_name)
+        log_stream_name: ($log_stream_name)
+        raw_log: true
+        region: "us-east-2"
+        endpoint: "logs.us-east-2.amazonaws.com"
+        log_retention: 365
+        tags: { 'tracing-otel': 'true'}
+
+    processors: {}
+
+    service:
+      pipelines:
+        logs:
+          receivers: [otlp]
+          processors: []
+          exporters: [awscloudwatchlogs]

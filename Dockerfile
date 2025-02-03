@@ -1,4 +1,4 @@
-FROM golang:1.22
+FROM golang:1.23
 
 # Copy the repository files
 COPY . /tmp/distributed-tracing-qe
@@ -16,10 +16,18 @@ RUN mkdir -p /tmp/go/bin $GOCACHE \
     && chmod -R 777 /tmp/go/bin $GOPATH $GOCACHE
 
 # Install dependencies required by test cases and debugging
-RUN apt-get update && apt-get install -y jq vim libreadline-dev
+RUN apt-get update && apt-get install -y jq vim libreadline-dev unzip
 
-# Install Chainsaw e2e testing tool
-RUN go install github.com/kyverno/chainsaw@v0.2.7
+# Install chainsaw
+RUN curl -L -o chainsaw.tar.gz https://github.com/kyverno/chainsaw/releases/download/v0.2.12/chainsaw_linux_amd64.tar.gz \
+    && tar -xvzf chainsaw.tar.gz \
+    && chmod +x chainsaw \
+    && mv chainsaw /usr/local/bin/
+
+# Install AWS CLI
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+    && unzip awscliv2.zip \
+    && ./aws/install
 
 # Install kubectl and oc
 RUN curl -LO https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest/openshift-client-linux.tar.gz \

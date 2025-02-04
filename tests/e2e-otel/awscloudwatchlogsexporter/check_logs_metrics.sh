@@ -26,10 +26,10 @@ export AWS_DEFAULT_REGION=${region}
 
 # Check if retentionInDays is 365
 RETENTION_DAYS=$(aws logs describe-log-groups --log-group-name-prefix $log_group_name --region $region --query "logGroups[?logGroupName=='$log_group_name'].retentionInDays" --output text)
-if [ "$RETENTION_DAYS" == "365" ]; then
-    echo "retentionInDays is 365"
+if [ "$RETENTION_DAYS" == "1" ]; then
+    echo "retentionInDays is 1"
 else
-    echo "retentionInDays is not 365"
+    echo "retentionInDays is not 1"
     exit 1
 fi
 
@@ -41,6 +41,18 @@ else
     echo "No app logs found in CloudWatchLogs"
     exit 1
 fi
+
+# Run the AWS CloudWatch command and store the result
+result=$(aws cloudwatch list-metrics --namespace Tracing-EMF --endpoint https://monitoring.us-east-2.amazonaws.com --region=us-east-2 --dimensions Name=telemetrygen,Value=metrics)
+
+# Check if the result contains the specific metric
+if echo "$result" | grep -q '"Name": "telemetrygen",'; then
+    echo "The metric with dimension Name 'telemetrygen' and value 'metrics' exists. Script succeeded."
+else
+    echo "The metric with dimension Name 'telemetrygen' and value 'metrics' does not exist. Script failed."
+    exit 1
+fi
+
 
 # Delete the log group
 aws logs delete-log-group --log-group-name $log_group_name --region $region

@@ -3,6 +3,7 @@ kind: Test
 metadata:
   name: awscloudwatchlogsexporter
 spec:
+  description: "Test the AWS CloudwatchLogs and EMF exporters"
   template: true
   bindings:
   - name: log_group_name
@@ -59,6 +60,12 @@ spec:
         file: app-plaintext-logs.yaml
     - assert:
         file: app-plaintext-logs-assert.yaml
+  - name: Generate metrics
+    try:
+    - apply:
+        file: generate-metrics.yaml
+    - assert:
+        file: generate-metrics-assert.yaml
   - name: Check the Cloudwatch log group and logs in AWS
     try:
     - script:
@@ -68,4 +75,4 @@ spec:
         - name: log_stream_name
           value: ($log_stream_name)
         timeout: 5m
-        content: ./check_logs.sh
+        content: ./check_logs_metrics.sh

@@ -5,7 +5,7 @@ metadata:
 spec:
   namespace: chainsaw-journald
   steps:
-  - name: step-00
+  - name: Create OTEL collector with Journald receiver
     try:
     - apply:
         file: otel-journaldreceiver.yaml
@@ -15,7 +15,7 @@ spec:
     try:
     - sleep:
         duration: 60s
-  - name: step-01
+  - name: Check the collected Journal logs
     try:
     - script:
         timeout: 5m

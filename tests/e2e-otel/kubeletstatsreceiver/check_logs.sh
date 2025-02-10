@@ -1,53 +1,70 @@
 #!/bin/bash
-# This script checks the OpenTelemetry collector pod for the presence of Logs.
+# This script checks the OpenTelemetry collector pod for the presence of specific logs.
 
-# Define the label selector
+# Define the label selector and namespace
 LABEL_SELECTOR="app.kubernetes.io/component=opentelemetry-collector"
-NAMESPACE=chainsaw-kubeletstatsreceiver
+NAMESPACE="chainsaw-kubeletstatsreceiver"
 
 # Define the search strings
-SEARCH_STRING1='k8s.pod.uid'
-SEARCH_STRING2='k8s.pod.name'
-SEARCH_STRING3='k8s.namespace.name'
-SEARCH_STRING4='k8s.container.name'
+SEARCH_STRINGS=(
+  "container.cpu.time"
+  "container.cpu.utilization"
+  "container.filesystem.available"
+  "container.filesystem.capacity"
+  "container.filesystem.usage"
+  "container.memory.major_page_faults"
+  "container.memory.page_faults"
+  "container.memory.rss"
+  "container.memory.usage"
+  "container.memory.working_set"
+  "k8s.node.cpu.time"
+  "k8s.node.cpu.utilization"
+  "k8s.node.filesystem.available"
+  "k8s.node.filesystem.capacity"
+  "k8s.node.filesystem.usage"
+  "k8s.node.memory.available"
+  "k8s.node.memory.major_page_faults"
+  "k8s.node.memory.page_faults"
+  "k8s.node.memory.rss"
+  "k8s.node.memory.usage"
+  "k8s.node.memory.working_set"
+  "k8s.pod.cpu.time"
+  "k8s.pod.cpu.utilization"
+  "k8s.pod.filesystem.available"
+  "k8s.pod.filesystem.capacity"
+  "k8s.pod.filesystem.usage"
+  "k8s.pod.memory.major_page_faults"
+  "k8s.pod.memory.page_faults"
+  "k8s.pod.memory.rss"
+  "k8s.pod.memory.usage"
+  "k8s.pod.memory.working_set"
+  "k8s.pod.network.errors"
+  "k8s.pod.network.io"
+)
 
 # Get the list of pods with the specified label
 PODS=($(kubectl -n $NAMESPACE get pods -l $LABEL_SELECTOR -o jsonpath='{.items[*].metadata.name}'))
 
-# Initialize flags to track if strings are found
-FOUND1=false
-FOUND2=false
-FOUND3=false
-FOUND4=false
+# Check if the PODS array is not empty
+if [ ${#PODS[@]} -eq 0 ]; then
+    echo "No pods found with label $LABEL_SELECTOR in namespace $NAMESPACE"
+    exit 1
+fi
 
-# Loop through each pod and search for the strings in the logs
-for POD in "${PODS[@]}"; do
-    # Search for the first string
-    if ! $FOUND1 && kubectl -n $NAMESPACE --tail=200 logs $POD | grep -q -- "$SEARCH_STRING1"; then
-        echo "\"$SEARCH_STRING1\" found in $POD"
-        FOUND1=true
-    fi
-    # Search for the second string
-    if ! $FOUND2 && kubectl -n $NAMESPACE --tail=200 logs $POD | grep -q -- "$SEARCH_STRING2"; then
-        echo "\"$SEARCH_STRING2\" found in $POD"
-        FOUND2=true
-    fi
-    # Search for the third string
-    if ! $FOUND3 && kubectl -n $NAMESPACE --tail=200 logs $POD | grep -q -- "$SEARCH_STRING3"; then
-        echo "\"$SEARCH_STRING3\" found in $POD"
-        FOUND3=true
-    fi
-    # Search for the fourth string
-    if ! $FOUND4 && kubectl -n $NAMESPACE --tail=200 logs $POD | grep -q -- "$SEARCH_STRING4"; then
-        echo "\"$SEARCH_STRING4\" found in $POD"
-        FOUND4=true
+# Take the first pod from the list
+POD=${PODS[0]}
+
+# Get all logs from the first pod
+LOGS=$(kubectl -n $NAMESPACE logs $POD --tail=-1)
+
+# Loop through each search string and check in the logs
+for STRING in "${SEARCH_STRINGS[@]}"; do
+    if echo "$LOGS" | grep -q -- "$STRING"; then
+        echo "\"$STRING\" found in $POD"
+    else
+        echo "\"$STRING\" not found in $POD"
+        exit 1
     fi
 done
 
-# Check if any of the strings was not found
-if ! $FOUND1 || ! $FOUND2 || ! $FOUND3 || ! $FOUND4; then
-    echo "No Node metrics found in OpenTelemetry collector"
-    exit 1
-else
-    echo "Found all the Node metrics in OpenTelemetry collector."
-fi
+echo "Log search completed for all defined strings in pod $POD."

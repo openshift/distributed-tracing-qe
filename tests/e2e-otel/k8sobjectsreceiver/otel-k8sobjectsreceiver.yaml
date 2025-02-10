@@ -56,7 +56,7 @@ metadata:
   namespace: chainsaw-k8sobjectsreceiver
 spec:
   mode: deployment
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.103.1
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.117.0
   serviceAccount: chainsaw-k8sobjectsreceiver
   config: |
     receivers:

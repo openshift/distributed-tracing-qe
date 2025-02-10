@@ -1,57 +1,69 @@
 #!/bin/bash
-# This script checks the OpenTelemetry collector pod for the presence of Logs.
+# This script checks the OpenTelemetry collector pod for the presence of specific logs.
 
-# Define the label selector
+# Define the label selector and namespace
 LABEL_SELECTOR="app.kubernetes.io/component=opentelemetry-collector"
-NAMESPACE=chainsaw-hostmetrics
+NAMESPACE="chainsaw-hostmetrics"
 
 # Define the search strings
-SEARCH_STRING1='process.pid'
-SEARCH_STRING2='process.parent_pid'
-SEARCH_STRING3='process.executable.name'
-SEARCH_STRING4='process.executable.path'
-SEARCH_STRING5='process.command'
+SEARCH_STRINGS=(
+  "process.pid"
+  "process.parent_pid"
+  "process.executable.name"
+  "process.executable.path"
+  "process.command"
+  "process.cpu.time"
+  "process.disk.io"
+  "process.memory.usage"
+  "process.memory.virtual"
+  "system.cpu.load_average.15m"
+  "system.cpu.load_average.1m"
+  "system.cpu.load_average.5m"
+  "system.cpu.time"
+  "system.disk.io"
+  "system.disk.io_time"
+  "system.disk.merged"
+  "system.disk.operation_time"
+  "system.disk.operations"
+  "system.disk.pending_operations"
+  "system.disk.weighted_io_time"
+  "system.filesystem.inodes.usage"
+  "system.filesystem.usage"
+  "system.memory.usage"
+  "system.network.connections"
+  "system.network.dropped"
+  "system.network.errors"
+  "system.network.io"
+  "system.network.packets"
+  "system.paging.faults"
+  "system.paging.operations"
+  "system.processes.count"
+  "system.processes.created"
+)
 
-# Initialize flags to track if strings are found
-FOUND1=false
-FOUND2=false
-FOUND3=false
-FOUND4=false
-FOUND5=false
+# Get the list of pods with the specified label
+PODS=($(kubectl -n $NAMESPACE get pods -l $LABEL_SELECTOR -o jsonpath='{.items[*].metadata.name}'))
 
-# Loop until all strings are found
-while ! $FOUND1 || ! $FOUND2 || ! $FOUND3 || ! $FOUND4 || ! $FOUND5; do
-    # Get the list of pods with the specified label
-    PODS=($(kubectl -n $NAMESPACE get pods -l $LABEL_SELECTOR -o jsonpath='{.items[*].metadata.name}'))
-    
-    # Loop through each pod and search for the strings in the logs
-    for POD in "${PODS[@]}"; do
-        # Search for the first string
-        if ! $FOUND1 && kubectl -n $NAMESPACE --tail=500 logs $POD | grep -q -- "$SEARCH_STRING1"; then
-            echo "\"$SEARCH_STRING1\" found in $POD"
-            FOUND1=true
-        fi
-        # Search for the second string
-        if ! $FOUND2 && kubectl -n $NAMESPACE --tail=500 logs $POD | grep -q -- "$SEARCH_STRING2"; then
-            echo "\"$SEARCH_STRING2\" found in $POD"
-            FOUND2=true
-        fi
-        # Search for the third string
-        if ! $FOUND3 && kubectl -n $NAMESPACE --tail=500 logs $POD | grep -q -- "$SEARCH_STRING3"; then
-            echo "\"$SEARCH_STRING3\" found in $POD"
-            FOUND3=true
-        fi
-        # Search for the fourth string
-        if ! $FOUND4 && kubectl -n $NAMESPACE --tail=500 logs $POD | grep -q -- "$SEARCH_STRING4"; then
-            echo "\"$SEARCH_STRING4\" found in $POD"
-            FOUND4=true
-        fi
-        # Search for the fifth string
-        if ! $FOUND5 && kubectl -n $NAMESPACE --tail=500 logs $POD | grep -q -- "$SEARCH_STRING5"; then
-            echo "\"$SEARCH_STRING5\" found in $POD"
-            FOUND5=true
-        fi
-    done
+# Check if the PODS array is not empty
+if [ ${#PODS[@]} -eq 0 ]; then
+    echo "No pods found with label $LABEL_SELECTOR in namespace $NAMESPACE"
+    exit 1
+fi
+
+# Take the first pod from the list
+POD=${PODS[0]}
+
+# Get all logs from the first pod
+LOGS=$(kubectl -n $NAMESPACE logs $POD --tail=-1)
+
+# Loop through each search string and check in the logs
+for STRING in "${SEARCH_STRINGS[@]}"; do
+    if echo "$LOGS" | grep -q -- "$STRING"; then
+        echo "\"$STRING\" found in $POD"
+    else
+        echo "\"$STRING\" not found in $POD"
+        exit 1
+    fi
 done
 
-echo "Found all the host metrics in OpenTelemetry collector."
+echo "Log search completed for all defined strings in pod $POD."

@@ -14,7 +14,7 @@ spec:
   - name: Wait for the metrics to be collected
     try:
     - sleep:
-        duration: 10s
+        duration: 60s
   - name: Check some of the metrics in the OTEl collector
     try:
     - script:

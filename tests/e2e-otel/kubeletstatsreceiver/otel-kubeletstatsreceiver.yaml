@@ -45,7 +45,7 @@ metadata:
   namespace: chainsaw-kubeletstatsreceiver
 spec:
   mode: daemonset
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.103.1
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.117.0
   serviceAccount: chainsaw-kubeletstatsreceiver
   env:
   - name: K8S_NODE_NAME
@@ -59,6 +59,8 @@ spec:
         auth_type: "serviceAccount"
         endpoint: "https://${env:K8S_NODE_NAME}:10250"
         insecure_skip_verify: true
+        extra_metadata_labels:
+          - container.id
     exporters:
       debug:
         verbosity: detailed

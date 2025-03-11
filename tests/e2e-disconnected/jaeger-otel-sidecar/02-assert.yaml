@@ -61,6 +61,31 @@ spec:
       telemetry:
         metrics:
           address: 0.0.0.0:8888
+  configVersions: 3
+  daemonSetUpdateStrategy: {}
+  deploymentUpdateStrategy: {}
+  ingress:
+    route: {}
+  ipFamilyPolicy: SingleStack
+  managementState: managed
+  mode: sidecar
+  observability:
+    metrics: {}
+  podDnsConfig: {}
+  replicas: 1
+  resources: {}
+  targetAllocator:
+    allocationStrategy: consistent-hashing
+    filterStrategy: relabel-config
+    observability:
+      metrics: {}
+    prometheusCR:
+      podMonitorSelector: {}
+      scrapeInterval: 30s
+      serviceMonitorSelector: {}
+    resources: {}
+  upgradeStrategy: automatic
+
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -202,10 +202,10 @@ spec:
         resources:
           limits:
             cpu: 120m
-            memory: "161061280"
+            memory: "214748368"
           requests:
             cpu: 36m
-            memory: "48318384"
+            memory: "64424512"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

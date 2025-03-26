@@ -1,10 +1,8 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: monolithic-multitenancy-openshift
 spec:
-  # this test must use a known namespace because of the CN field of the TLS certificate and the ClusterRoleBinding
   namespace: chainsaw-monolithic-multitenancy
   steps:
   - name: step-01
@@ -19,6 +17,18 @@ spec:
         file: 02-install-otelcol.yaml
     - assert:
         file: 02-assert.yaml
+  - name: Install hotrod app
+    try:
+    - apply:
+        file: install-hotrod.yaml
+    - assert:
+        file: assert-install-hotrod.yaml
+  - name: Generate traces from hotrod app
+    try:
+    - apply:
+        file: hotrod-tracegen.yaml
+    - assert:
+        file: assert-hotrod-tracegen.yaml
   - name: step-03
     try:
     - apply:

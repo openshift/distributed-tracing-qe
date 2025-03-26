@@ -3,7 +3,7 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   creationTimestamp: null
-  name: monitoring
+  name: tempo-monitoring
 spec:
   # Avoid running this test case in parallel to prevent the deletion of shared resources used by multiple tests, specifically in the context of OpenShift user workload monitoring.
   concurrent: false

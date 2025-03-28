@@ -1,56 +1,36 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  creationTimestamp: null
   name: rapidast-otel
 spec:
+  namespace: rapidast-otel
   steps:
-  - name: step-00
+  - name: Create project to run DAST job
     try:
     - apply:
-        file: 00-create-project.yaml
+        file: create-project.yaml
     - assert:
-        file: 00-assert.yaml
-  - name: step-01
+        file: assert-create-project.yaml
+  - name: Create SA with privileged cluster role
     try:
     - apply:
-        file: 01-create-sa.yaml
+        file: create-sa.yaml
     - assert:
-        file: 01-assert.yaml
-  - name: step-02
+        file: assert-create-sa.yaml
+  - name: Generate RapiDAST configmap
     try:
     - script:
-        timeout: 30s
-        content: ./create_rapidast_configmap.sh
+        timeout: 20s
+        content: ./create-rapidast-configmap.sh
     - assert:
-        file: 02-assert.yaml
-  - name: step-03
+        file: assert-rapidast-configmap.yaml
+  - name: Run RapiDAST job
     try:
     - apply:
-        file: 03-rapidast-job.yaml
+        file: rapidast-job.yaml
     - assert:
-        file: 03-assert.yaml
-  - name: step-04
-    try:
-    - script:
-        timeout: 6m
-        content: ./results.sh
+        file: assert-rapidast-job.yaml
     finally:
-    - command:
-        timeout: 1m
-        entrypoint: oc
-        args:
-        - -n
-        - rapidast-otel
-        - delete
-        - pod
-        - rapiterm-otel
-    - command:
-        timeout: 1m
-        entrypoint: oc
-        args:
-        - -n
-        - rapidast-otel
-        - delete
-        - pod
-        - --selector=batch.kubernetes.io/job-name=rapidast-job
+    - podLogs:
+        tail: -1
+        selector: job-name=rapidast-job

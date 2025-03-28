@@ -18,7 +18,7 @@ metadata:
   name: rapidast-job
   namespace: rapidast-tempo
 spec:
-  backoffLimit: 3
+  backoffLimit: 0
   completionMode: NonIndexed
   completions: 1
   parallelism: 1
@@ -35,7 +35,18 @@ spec:
       - command:
         - sh
         - -c
-        - rapidast.py --log-level debug --config /helm/config/rapidastconfig.yaml && find /opt/rapidast/results/tempo -name zap-report.json -exec cat {} \;
+        - |
+          # Run rapidast and process results
+          rapidast.py --log-level debug --config /helm/config/rapidastconfig.yaml
+          report=$(find /opt/rapidast/results/ -name zap-report.json -exec cat {} \;)
+          echo $report
+          high_count=$(echo "$report" | grep -o '"riskdesc":.*High' | wc -l)
+          medium_count=$(echo "$report" | grep -o '"riskdesc":.*Medium' | wc -l)
+          echo "rapidast result: riskHigh=$high_count riskMedium=$medium_count"
+          if [ "$high_count" -gt 0 ]; then
+            echo "High risk alert, please check the scan result report"
+            exit 1
+          fi
         image: quay.io/redhatproductsecurity/rapidast:latest
         imagePullPolicy: Always
         name: rapidast-chart

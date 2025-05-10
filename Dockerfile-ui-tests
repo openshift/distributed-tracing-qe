@@ -1,0 +1,28 @@
+# This Dockerfile is used by OpenShift CI for running the Distributed Tracing UI plugin tests
+FROM fedora:latest
+
+# Install essential build dependencies and clean up
+RUN dnf -y update && \
+    dnf -y install --setopt=tsflags=nodocs golang wget tar nodejs yarn gzip openssh-clients httpd-tools xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel nss libXScrnSaver alsa-lib vulkan-loader mesa-vulkan-drivers && \
+    dnf clean all && \
+    rm -rf /var/cache/yum/*
+
+# Install kubectl and oc
+RUN curl -L -o oc.tar.gz https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest/openshift-client-linux.tar.gz \
+    && tar -xvzf oc.tar.gz \
+    && chmod +x kubectl oc \
+    && mv oc kubectl /usr/local/bin/
+
+# Install Google Chrome
+RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
+    yum install -y ./google-chrome-stable_current_*.rpm && \
+    rm ./google-chrome-stable_current_*.rpm && \
+    yum clean all && \
+    rm -rf /var/cache/yum/*
+
+# Install chainsaw
+RUN curl -L -o chainsaw.tar.gz https://github.com/kyverno/chainsaw/releases/download/v0.2.12/chainsaw_linux_amd64.tar.gz \
+    && tar -xvzf chainsaw.tar.gz \
+    && chmod +x chainsaw \
+    && mv chainsaw /usr/local/bin/
+

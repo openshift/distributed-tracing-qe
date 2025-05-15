@@ -1,5 +1,0 @@
-apiVersion: v1
-kind: Secret
-metadata:
-  name: ibm-cos-secret
-type: Opaque

@@ -1,0 +1,61 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: verify-traces
+spec:
+  template:
+    spec:
+      containers:
+        - name: verify-traces
+          image: ghcr.io/grafana/tempo-operator/test-utils:main
+          command:
+            - /bin/bash
+            - -eux
+            - -c
+          args:
+            - |
+              curl \
+                -G \
+                http://tempo-tailsmp:3200/api/search \
+                --data-urlencode 'q={ resource.service.name="green" }' \
+                | tee /tmp/jaeger.out
+              num_traces=$(jq ".traces | length" /tmp/jaeger.out)
+              if [[ "$num_traces" != "0" ]]; then
+                echo && echo "The TtraceQL API returned $num_traces instead of 0 trace."
+                exit 1
+              fi
+      
+              curl \
+                -G \
+                http://tempo-tailsmp:3200/api/search \
+                --data-urlencode 'q={ resource.service.name="customer" }' \
+                | tee /tmp/jaeger.out
+              num_traces=$(jq ".traces | length" /tmp/jaeger.out)
+              if [[ "$num_traces" = "0" ]]; then
+                echo && echo "The TtraceQL API returned $num_traces"
+                exit 1
+              fi
+
+              echo "Fetch the first trace ID and store it in a variable"
+              traceID=$(curl -G http://tempo-tailsmp:3200/api/search \
+                              --data-urlencode 'q={ resource.service.name="customer" }' | jq -r '.traces[0].traceID')
+
+              echo "Use the trace ID to fetch the complete trace"
+              traceOutput=$(curl -G http://tempo-tailsmp:3200/api/traces/$traceID)
+
+              echo "Check for the strings in the trace output"
+              stringsToSearch=(
+                  "\"key\":\"http.target\""
+                  "\"stringValue\":\"/customer\""
+                  "\"key\":\"rpc.service\""
+                  "\"stringValue\":\"driver.DriverService\""
+              )
+              for searchString in "${stringsToSearch[@]}"; do
+                  if echo "$traceOutput" | grep -q "$searchString"; then
+                      echo "Trace output for service grpc-rbac-1 contains: $searchString"
+                  else
+                      echo "Trace output for service does not contain: $searchString"
+                      exit 1
+                  fi
+              done
+      restartPolicy: Never

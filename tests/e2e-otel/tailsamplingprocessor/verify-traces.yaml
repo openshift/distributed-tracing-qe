@@ -45,7 +45,7 @@ spec:
 
               echo "Check for the strings in the trace output"
               stringsToSearch=(
-                  "\"key\":\"http.target\""
+                  "\"key\":\"service.name\""
                   "\"stringValue\":\"/customer\""
                   "\"key\":\"rpc.service\""
                   "\"stringValue\":\"driver.DriverService\""

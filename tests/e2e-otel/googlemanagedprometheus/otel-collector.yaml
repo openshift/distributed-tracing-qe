@@ -1,10 +1,3 @@
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chainsaw-gmpmetrics-sa
-  namespace: chainsaw-gmpmetrics
-
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -43,68 +36,62 @@ metadata:
 spec:
   image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.119.0
   serviceAccount: chainsaw-gmpmetrics-sa
-  volumes:
-    - name: gcp-key-volume
-      secret:
-        secretName: gcp-secret
-        items:
-        - key: key.json
-          path: key.json
-  volumeMounts:
-    - name: gcp-key-volume
-      mountPath: /tmp/gcp/
-      readOnly: true
   env:
     - name: GOOGLE_APPLICATION_CREDENTIALS
-      value: /tmp/gcp/key.json
-    - name: GCLOUD_PROJECT
-      valueFrom:
-        secretKeyRef:
-          name: gcp-secret
-          key: project-id
+      value: "/etc/workload-identity/credential-configuration.json"
+
+  volumeMounts:
+    - name: service-account-token-volume
+      mountPath: "/var/run/secrets/otel/serviceaccount"
+      readOnly: true
+    - name: workload-identity-credential-configuration
+      mountPath: "/etc/workload-identity"
+      readOnly: true
+
+  volumes:
+    - name: service-account-token-volume
+      projected:
+        sources:
+        - serviceAccountToken:
+            audience: "openshift"
+            expirationSeconds: 3600
+            path: token
+    - name: workload-identity-credential-configuration
+      configMap:
+        name: gcp-wif-credentials
+ 
   config:
     exporters:
       otlphttp:
         encoding: json
         endpoint: https://telemetry.googleapis.com
-        # Use the googleclientauth extension
         auth:
-          authenticator: googleclientauth # Use googleclientauth
+          authenticator: googleclientauth
 
     extensions:
-      # Standard for the collector. Used for probes.
       health_check:
         endpoint: "0.0.0.0:13133"
-      # This is an auth extension that adds Google Application Default Credentials to http and gRPC requests.
-      googleclientauth: {}
+      googleclientauth:
+        project: "openshift-qe"
 
     processors:
-      # When sending metrics to the GCP OTLP endpoint, the gcp.project_id resource attribute is required to be set to your project ID.
-      resource/gcp_project_id:
+      resource/set_gcp_defaults:
         attributes:
         - action: insert
-          # MAKE SURE YOU REPLACE THIS WITH YOUR PROJECT ID
-          value: ${env:GCLOUD_PROJECT}
+          value: "openshift-qe"
           key: gcp.project_id
-      # This filter is a standard part of handling the collector's self-observability metrics. Not related to OTLP ingestion.
-      filter/self-metrics:
-        metrics:
-          include:
-            match_type: strict
-            metric_names:
-            - otelcol_process_uptime
-            - otelcol_process_memory_rss
-            - otelcol_grpc_io_client_completed_rpcs
-            - otelcol_googlecloudmonitoring_point_count
-      # The recommended batch size for the OTLP endpoint is 200 metric data points.
+        - action: insert
+          value: "us-central1"
+          key: location
+        - action: insert
+          value: "ikanse-12-7lnxm"
+          key: cluster
+
       batch:
         send_batch_max_size: 200
         send_batch_size: 200
         timeout: 5s
 
-      # The k8sattributes processor adds k8s resource attributes to metrics based on the source IP that sent the metrics to the collector.
-      # k8s attributes are important for avoiding errors from timeseries "collisions".
-      # These attributes help distinguish workloads from each other, and provide useful metadata (e.g. namespace) when querying.
       k8sattributes:
         extract:
           metadata:
@@ -128,27 +115,11 @@ spec:
             name: k8s.pod.uid
         - sources:
           - from: connection
-      # Standard processor for gracefully degrading when overloaded to prevent OOM.
+
       memory_limiter:
         check_interval: 1s
         limit_percentage: 65
         spike_limit_percentage: 20
-
-      # Standard processor for enriching self-observability metrics. Unrelated to OTLP ingestion.
-      metricstransform/self-metrics:
-        transforms:
-        - action: update
-          include: otelcol_process_uptime
-          operations:
-          - action: add_label
-            new_label: version
-            new_value: Google-Cloud-OTLP manifests:0.1.0 otel/opentelemetry-collector-contrib:0.118.0
-
-      # The resourcedetection processor, similar to the k8sattributes processor, enriches metrics with important metadata.
-      # The gcp detector provides the cluster name and cluster location.
-      resourcedetection:
-        detectors: [gcp]
-        timeout: 10s
 
       # This transform processor avoids ingestion errors if metrics contain attributes with names that are reserved for the prometheus_target resource.
       transform/collision:
@@ -168,54 +139,26 @@ spec:
           - set(attributes["exported_project_id"], attributes["project_id"])
           - delete_key(attributes, "project_id")
 
+
     receivers:
-      # This collector is configured to accept OTLP metrics, logs, and traces, and is designed to receive OTLP from workloads running in the cluster.
       otlp:
         protocols:
           grpc: {}
           http: {}
-      # Push the collector's own self-observability metrics to the otlp receiver.
-      prometheus/self-metrics:
-        config:
-          scrape_configs:
-            - job_name: 'otel-collector'
-              scrape_interval: 10s
-              static_configs:
-                - targets: [ '0.0.0.0:8888' ]
 
     service:
       extensions:
       - health_check
       - googleclientauth
       pipelines:
-        # Recieve OTLP metrics, and export metrics to GMP using the otlphttp exporter.
         metrics/otlp:
           exporters:
           - otlphttp
           processors:
           - k8sattributes
           - memory_limiter
-          - resource/gcp_project_id
-          - resourcedetection
+          - resource/set_gcp_defaults
           - transform/collision
           - batch
           receivers:
           - otlp
-        # Scrape self-observability Prometheus metrics, and export metrics to GMP using the otlphttp exporter.
-        metrics/self-metrics:
-          exporters:
-          - otlphttp
-          processors:
-          - filter/self-metrics
-          - metricstransform/self-metrics
-          - k8sattributes
-          - memory_limiter
-          - resource/gcp_project_id
-          - resourcedetection
-          - batch
-          receivers:
-          - prometheus/self-metrics
-      telemetry:
-        metrics:
-          address: :8888
-          level: normal

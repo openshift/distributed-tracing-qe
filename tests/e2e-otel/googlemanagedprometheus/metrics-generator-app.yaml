@@ -33,9 +33,9 @@ spec:
                 apiVersion: v1
                 fieldPath: metadata.labels['app.kubernetes.io/component']
           - name: OTEL_COLLECTOR_NAME
-            value: 'opentelemetry-collector'
+            value: 'gmp-collector'
           - name: OTEL_COLLECTOR_NAMESPACE
-            value: 'opentelemetry'
+            value: 'chainsaw-gmpmetrics'
           - name: OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
             value: $(OTEL_COLLECTOR_NAME).$(OTEL_COLLECTOR_NAMESPACE).svc.cluster.local:4317
           - name: OTEL_RESOURCE_ATTRIBUTES

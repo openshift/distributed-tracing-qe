@@ -1,11 +1,11 @@
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 # Set the GCP vars - MUST MATCH THE CREATION SCRIPT EXACTLY!
 PROJECT_ID=$(gcloud config get-value project)
 OTEL_SA_NAME="chainsaw-gmpmetrics-sa"
 OTEL_NAMESPACE="chainsaw-gmpmetrics"
-GCP_SA_NAME="otel-gmpmetrics-impersonate-sa" # New: Google Service Account for impersonation
+GCP_SA_NAME="otel-gmpmetrics-impersonate-sa"
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 OIDC_ISSUER=$(oc get authentication.config cluster -o jsonpath='{.spec.serviceAccountIssuer}')
 POOL_ID=$(echo "$OIDC_ISSUER" | awk -F'/' '{print $NF}' | sed 's/-oidc$//')
@@ -47,7 +47,7 @@ gcloud projects remove-iam-policy-binding "$PROJECT_ID" \
 echo "Deleting Google Cloud Service Account: $GCP_SA_EMAIL..."
 gcloud iam service-accounts delete "$GCP_SA_EMAIL" \
   --project "$PROJECT_ID" \
-  --quiet --etag If-Match="*" || true
+  --quiet || true
 
 echo "--- Google Cloud IAM roles and Service Account successfully removed. ---"
 

@@ -109,7 +109,3 @@ echo "Cleaning up local credential file: $CRED_CONFIG_FILE"
 # rm "$CRED_CONFIG_FILE"
 
 echo "--- Credential ConfigMap created. ---"
-
-echo "--- Audience String for Workload Identity Federation ---"
-AUDIENCE="https://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}/providers/${PROVIDER_ID}"
-echo "Audience String: $AUDIENCE"

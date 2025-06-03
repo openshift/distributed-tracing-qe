@@ -30,9 +30,6 @@ spec:
           - otlp
           receivers:
           - filelog
-      telemetry:
-        metrics:
-          address: 0.0.0.0:8888
   managementState: managed
   mode: sidecar
   volumeMounts:

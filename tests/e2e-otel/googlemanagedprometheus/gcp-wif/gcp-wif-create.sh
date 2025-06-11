@@ -5,7 +5,7 @@ set -euo pipefail
 PROJECT_ID=$(gcloud config get-value project)
 OTEL_NAMESPACE="chainsaw-gmpmetrics"
 OTEL_SA_NAME="chainsaw-gmpmetrics-sa"
-GCP_SA_NAME="otel-gmpmetrics-impersonate-sa" # New: Google Service Account for impersonation
+GCP_SA_NAME="otel-gmpmetrics-impersonate-sa"
 
 # --- Derived GCP & OpenShift Vars ---
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
@@ -105,7 +105,6 @@ oc create configmap "$CONFIGMAP_NAME" \
   --dry-run=client -o yaml | oc apply -f -
 
 echo "Cleaning up local credential file: $CRED_CONFIG_FILE"
-# Uncomment the line below to enable cleanup
-# rm "$CRED_CONFIG_FILE"
+rm "$CRED_CONFIG_FILE"
 
-echo "--- Credential ConfigMap created. ---"
+echo "--- Credential ConfigMap $CONFIGMAP_NAME created. ---"

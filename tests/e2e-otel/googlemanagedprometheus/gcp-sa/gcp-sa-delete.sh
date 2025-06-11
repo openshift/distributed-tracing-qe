@@ -1,36 +1,29 @@
 #!/bin/bash
 set -uo pipefail
 
-# Set the GCP vars - MUST MATCH THE CREATION SCRIPT EXACTLY!
+# --- Set the GCP & OpenShift Vars - MUST MATCH THE CREATION SCRIPT EXACTLY! ---
 PROJECT_ID=$(gcloud config get-value project)
-OTEL_SA_NAME="chainsaw-gmpmetrics-sa"
 OTEL_NAMESPACE="chainsaw-gmpmetrics"
-GCP_SA_NAME="otel-gmpmetrics-impersonate-sa"
-PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
-OIDC_ISSUER=$(oc get authentication.config cluster -o jsonpath='{.spec.serviceAccountIssuer}')
-POOL_ID=$(echo "$OIDC_ISSUER" | awk -F'/' '{print $NF}' | sed 's/-oidc$//')
+OTEL_SA_NAME="chainsaw-gmpmetrics-sa"
+GCP_SA_NAME="otel-gmpmetrics-sa"
 
-# Define the ConfigMap name used in the creation script
-CONFIGMAP_NAME="gcp-wif-credentials"
+# Define the Secret name used in the creation script
+SECRET_NAME="gcp-service-account-key"
 
-echo "--- Starting cleanup process for OpenTelemetry Workload Identity resources ---"
+echo "--- Starting cleanup process for OpenTelemetry Google Cloud Service Account Key resources ---"
 echo "  GCP Project ID: $PROJECT_ID"
 echo "  OpenShift Namespace: $OTEL_NAMESPACE"
 echo "  OpenShift Service Account: $OTEL_SA_NAME"
 echo "  Google Cloud Service Account: $GCP_SA_NAME"
+echo "  OpenShift Secret Name: $SECRET_NAME"
 echo "----------------------------------------------------------------------"
 
-# --- 1. Revoke Google Cloud IAM Bindings and Delete Google Service Account ---
+# --- 1. Delete Google Cloud Service Account and Revoke IAM Bindings ---
 
 # Get the full email of the Google Service Account
 GCP_SA_EMAIL="${GCP_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
-echo "Revoking roles/iam.workloadIdentityUser from Kubernetes Service Account's ability to impersonate $GCP_SA_EMAIL..."
-gcloud iam service-accounts remove-iam-policy-binding "$GCP_SA_EMAIL" \
-  --role="roles/iam.workloadIdentityUser" \
-  --member="principal://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL_ID/subject/system:serviceaccount:${OTEL_NAMESPACE}:${OTEL_SA_NAME}" \
-  --project="$PROJECT_ID" \
-  --quiet || true
+# Important: We no longer need to remove the workloadIdentityUser role as it was not granted.
 
 echo "Revoking Monitoring Metric Writer role from $GCP_SA_EMAIL..."
 gcloud projects remove-iam-policy-binding "$PROJECT_ID" \
@@ -44,7 +37,8 @@ gcloud projects remove-iam-policy-binding "$PROJECT_ID" \
   --role="roles/telemetry.metricsWriter" \
   --quiet || true
 
-echo "Deleting Google Cloud Service Account: $GCP_SA_EMAIL..."
+# Note: Deleting the service account will automatically delete all associated keys.
+echo "Deleting Google Cloud Service Account: $GCP_SA_EMAIL (This will also delete its keys)..."
 gcloud iam service-accounts delete "$GCP_SA_EMAIL" \
   --project "$PROJECT_ID" \
   --quiet || true
@@ -53,17 +47,21 @@ echo "--- Google Cloud IAM roles and Service Account successfully removed. ---"
 
 # --- 2. Delete OpenShift Resources ---
 
-echo "Deleting Kubernetes ConfigMap: $CONFIGMAP_NAME in namespace $OTEL_NAMESPACE..."
-oc delete configmap "$CONFIGMAP_NAME" -n "$OTEL_NAMESPACE" \
-  --ignore-not-found=true || true # Ignore if ConfigMap doesn't exist
+echo "Deleting Kubernetes Secret: $SECRET_NAME in namespace $OTEL_NAMESPACE..."
+oc delete secret "$SECRET_NAME" -n "$OTEL_NAMESPACE" \
+  --ignore-not-found=true || true
 
 echo "Deleting OpenShift Service Account: $OTEL_SA_NAME in namespace $OTEL_NAMESPACE..."
 oc delete serviceaccount "$OTEL_SA_NAME" -n "$OTEL_NAMESPACE" \
-  --ignore-not-found=true || true # Ignore if SA doesn't exist
+  --ignore-not-found=true
 
 echo "Deleting OpenShift project/namespace: $OTEL_NAMESPACE..."
-# 'oc delete project' is equivalent to 'oc delete namespace' for projects.
 oc delete project "$OTEL_NAMESPACE" \
+  --ignore-not-found=true \
+  --wait=false || true
+
+echo "Deleting OpenShift project/namespace: chainsaw-kubeletstatsreceiver..."
+oc delete project chainsaw-kubeletstatsreceiver \
   --ignore-not-found=true \
   --wait=false || true
 

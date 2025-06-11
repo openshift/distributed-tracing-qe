@@ -35,33 +35,44 @@ metadata:
   namespace: chainsaw-gmpmetrics
 spec:
   serviceAccount: chainsaw-gmpmetrics-sa
+  # Mount the Google WIF credential file and expose the credential path as env var
+  env:
+    - name: GOOGLE_APPLICATION_CREDENTIALS
+      value: "/etc/workload-identity/credential-configuration.json"
 
   volumeMounts:
-    - name: gcp-sa-key-volume
-      mountPath: /etc/otel-collector/secrets
+    - name: service-account-token-volume
+      mountPath: "/var/run/secrets/otel/serviceaccount"
+      readOnly: true
+    - name: workload-identity-credential-configuration
+      mountPath: "/etc/workload-identity"
       readOnly: true
 
   volumes:
-    - name: gcp-sa-key-volume
-      secret:
-        secretName: gcp-service-account-key
-
+    - name: service-account-token-volume
+      projected:
+        sources:
+        - serviceAccountToken:
+            audience: "openshift"
+            expirationSeconds: 3600
+            path: token
+    - name: workload-identity-credential-configuration
+      configMap:
+        name: gcp-wif-credentials
+ 
   config:
     exporters:
       otlphttp:
         encoding: json
-        endpoint: https://telemetry.googleapis.com/v1/metrics
+        endpoint: https://telemetry.googleapis.com
         auth:
-          authenticator: oauth2client
-        headers:
-          X-Goog-User-Project: "openshift-qe"
-
+          authenticator: googleclientauth
 
     extensions:
       health_check:
         endpoint: "0.0.0.0:13133"
-      oauth2client:
-        credentials_file: /etc/otel-collector/secrets/key.json
+      googleclientauth:
+        project: "openshift-qe"
 
     processors:
       resource/set_gcp_defaults:
@@ -128,6 +139,8 @@ spec:
           - set(attributes["exported_project_id"], attributes["project_id"])
           - delete_key(attributes, "project_id")
 
+      metricstarttime:
+          strategy: true_reset_point
 
     receivers:
       otlp:
@@ -138,7 +151,7 @@ spec:
     service:
       extensions:
       - health_check
-      - oauth2client
+      - googleclientauth
       pipelines:
         metrics/otlp:
           exporters:
@@ -148,6 +161,7 @@ spec:
           - memory_limiter
           - resource/set_gcp_defaults
           - transform/collision
+          - metricstarttime
           - batch
           receivers:
           - otlp

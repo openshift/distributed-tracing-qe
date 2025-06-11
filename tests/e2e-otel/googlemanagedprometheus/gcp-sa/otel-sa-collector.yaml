@@ -34,31 +34,21 @@ metadata:
   name: gmp
   namespace: chainsaw-gmpmetrics
 spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.119.0
   serviceAccount: chainsaw-gmpmetrics-sa
+  # Mount the Google SA credentials and expose the credential path as env var
   env:
     - name: GOOGLE_APPLICATION_CREDENTIALS
-      value: "/etc/workload-identity/credential-configuration.json"
+      value: "/etc/google-cloud-sa/sa-key.json"
 
   volumeMounts:
-    - name: service-account-token-volume
-      mountPath: "/var/run/secrets/otel/serviceaccount"
-      readOnly: true
-    - name: workload-identity-credential-configuration
-      mountPath: "/etc/workload-identity"
+    - name: google-cloud-sa-credential-configuration
+      mountPath: "/etc/google-cloud-sa"
       readOnly: true
 
   volumes:
-    - name: service-account-token-volume
-      projected:
-        sources:
-        - serviceAccountToken:
-            audience: "openshift"
-            expirationSeconds: 3600
-            path: token
-    - name: workload-identity-credential-configuration
-      configMap:
-        name: gcp-wif-credentials
+    - name: google-cloud-sa-credential-configuration
+      secret:
+        secretName: gcp-service-account-key
  
   config:
     exporters:
@@ -139,6 +129,8 @@ spec:
           - set(attributes["exported_project_id"], attributes["project_id"])
           - delete_key(attributes, "project_id")
 
+      metricstarttime:
+          strategy: true_reset_point
 
     receivers:
       otlp:
@@ -159,6 +151,7 @@ spec:
           - memory_limiter
           - resource/set_gcp_defaults
           - transform/collision
+          - metricstarttime
           - batch
           receivers:
           - otlp

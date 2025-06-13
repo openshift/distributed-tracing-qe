@@ -12,7 +12,7 @@ spec:
   - name: step-00
     try:
     - apply:
-        file: 00-install-jaeger.yaml
+        file: 00-install-tempo.yaml
     - assert:
         file: 00-assert.yaml
   - name: step-01
@@ -35,11 +35,33 @@ spec:
         file: 03-assert.yaml
   - name: step-04
     try:
-    - script:
-        timeout: 5m
-        content: ./check_traces.sh
+    - apply:
+        file: verify-traces.yaml
+    - assert:
+        file: assert-verify-traces.yaml
   - name: step-05
     try:
     - script:
         timeout: 5m
         content: ./check_metrics.sh
+  - name: Run the must-gather and verify the contents
+    try:
+    - command:
+        entrypoint: oc
+        args:
+        - get
+        - pods
+        - -A
+        - -l control-plane=controller-manager
+        - -l app.kubernetes.io/name=opentelemetry-operator
+        - -o 
+        - jsonpath={.items[0].metadata.namespace}
+        outputs:
+        - name: OTEL_NAMESPACE
+          value: ($stdout)
+    - script:
+        env:
+        - name: otelnamespace
+          value: ($OTEL_NAMESPACE)
+        timeout: 5m
+        content: ./check_must_gather.sh

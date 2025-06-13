@@ -58,9 +58,6 @@ spec:
           - opencensus
           - otlp
           - zipkin
-      telemetry:
-        metrics:
-          address: 0.0.0.0:8888
   configVersions: 3
   daemonSetUpdateStrategy: {}
   deploymentUpdateStrategy: {}

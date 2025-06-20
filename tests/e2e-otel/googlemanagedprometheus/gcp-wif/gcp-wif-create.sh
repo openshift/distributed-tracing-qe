@@ -20,6 +20,18 @@ PROVIDER_ID=$(gcloud iam workload-identity-pools providers list \
   --filter="displayName:$POOL_ID" \
   --format="value(name)" | awk -F'/' '{print $NF}')
 
+# NOTE: For OSD-GCP clusters, the above automatic derivation may not work correctly.
+# In that case, use these static values instead:
+#
+# OIDC_ISSUER="https://openshift.com"
+# PROVIDER_ID="oidc"
+# 
+# For POOL_ID, get this from the OCM command:
+# POOL_ID=$(ocm gcp describe wif-config <wif-config-name> | grep -o 'pool_id: [^"]*' | cut -d' ' -f2)
+# 
+# Example static values for OSD-GCP:
+# POOL_ID="2ic2l13qv5jc96j5hljg13j8qg0r8bhm"
+
 CRED_CONFIG_FILE="/tmp/credential-configuration.json"
 CONFIGMAP_NAME="gcp-wif-credentials"
 

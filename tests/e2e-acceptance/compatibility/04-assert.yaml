@@ -1,6 +1,0 @@
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: verify-traces-jaeger
-status:
-  succeeded: 1

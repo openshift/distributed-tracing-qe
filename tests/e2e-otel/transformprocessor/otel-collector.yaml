@@ -3,7 +3,7 @@ kind: OpenTelemetryCollector
 metadata:
   name: tprocssr
 spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.117.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
   config:
     receivers:
       otlp:
@@ -28,10 +28,10 @@ spec:
               - truncate_all(attributes, 4096)
           - context: span
             statements:
-              - set(attributes["net.peer.ip"], "5.6.7.8") where attributes["net.peer.ip"] == "1.2.3.4"
+              - set(attributes["net.peer.ip"], "5.6.7.8") where attributes["net.sock.peer.addr"] == "1.2.3.4"
               - set(attributes["peer.service"], "modified-server") where attributes["peer.service"] == "telemetrygen-server"
               - set(attributes["peer.service"], "modified-client") where attributes["peer.service"] == "telemetrygen-client"
-              - set(name, "modified-operation") where name == "okey-dokey"
+              - set(name, "modified-operation") where name == "okey-dokey-0"
               - limit(attributes, 100, [])
               - truncate_all(attributes, 4096)
 

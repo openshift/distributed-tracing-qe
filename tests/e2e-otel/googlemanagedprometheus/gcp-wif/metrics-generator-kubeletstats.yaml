@@ -45,7 +45,7 @@ metadata:
   namespace: chainsaw-kubeletstatsreceiver
 spec:
   mode: daemonset
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.117.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
   serviceAccount: chainsaw-kubeletstatsreceiver
   env:
   - name: K8S_NODE_NAME

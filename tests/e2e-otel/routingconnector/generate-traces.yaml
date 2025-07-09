@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
       - name: telemetrygen
-        image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.92.0
+        image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.129.0
         args:
         - traces
         - --otlp-endpoint=routing-collector.chainsaw-routecnctr.svc:4317
@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
       - name: telemetrygen
-        image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.92.0
+        image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.129.0
         args:
         - traces
         - --otlp-endpoint=routing-collector.chainsaw-routecnctr.svc:4317
@@ -49,7 +49,7 @@ spec:
     spec:
       containers:
       - name: telemetrygen
-        image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.92.0
+        image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.129.0
         args:
         - traces
         - --otlp-endpoint=routing-collector.chainsaw-routecnctr.svc:4317

@@ -3,7 +3,7 @@ kind: OpenTelemetryCollector
 metadata:
   name: routing
 spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.117.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
   config:
     receivers:
       otlp:
@@ -29,7 +29,6 @@ spec:
     connectors:
       routing:
         error_mode: ignore
-        match_once: false
         default_pipelines: [traces/green]
         table:
           - statement: route() where attributes["X-Tenant"] == "red"

@@ -4,7 +4,7 @@ FROM registry.redhat.io/openshift4/ose-cli:latest
 WORKDIR /tmp/
 
 # Install system dependencies
-RUN dnf -y install jq vim unzip git make curl tar \
+RUN dnf -y install jq vim unzip git make curl tar python3-pip \
     && dnf clean all \
     && rm -rf /var/cache/dnf
 
@@ -60,6 +60,15 @@ RUN curl -LO https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-c
     && tar -xf google-cloud-cli-linux-x86_64.tar.gz \
     && ./google-cloud-sdk/install.sh -q \
     && rm -f google-cloud-cli-linux-x86_64.tar.gz
+
+# Install operator-sdk
+RUN echo "Install operator-sdk and dependencies" \
+    && export OPERATOR_SDK_VERSION=1.36.1 \
+    && export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac) \
+    && export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION} \
+    && curl -Lo /usr/local/bin/operator-sdk ${OPERATOR_SDK_DL_URL}/operator-sdk_linux_${ARCH} \
+    && chmod +x /usr/local/bin/operator-sdk \
+    && operator-sdk version
 
 # Add gcloud to PATH
 ENV PATH="/tmp/google-cloud-sdk/bin:${PATH}"

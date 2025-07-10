@@ -1,0 +1,65 @@
+FROM registry.redhat.io/openshift4/ose-cli:latest
+
+# Set the working directory
+WORKDIR /tmp/
+
+# Install system dependencies
+RUN dnf -y install jq vim unzip git make curl tar \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+# Set environment variables
+ENV GOPATH=/tmp/go \
+    GOBIN=/tmp/go/bin \
+    GOCACHE=/tmp/.cache/go-build \
+    PATH=$PATH:/tmp/go/bin:/usr/local/go/bin \
+    CHAINSAW_VERSION=v0.2.12 \
+    GO_VERSION=1.23.0
+
+# Install Go and create directories with proper permissions
+RUN curl -Lo /tmp/go.tar.gz https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz \
+    && rm -f /tmp/go.tar.gz \
+    && mkdir -p /tmp/go/bin $GOCACHE \
+    && chmod 777 /tmp/go/bin $GOPATH $GOCACHE \
+    && go version
+
+# Install chainsaw, oc and kubectl
+RUN curl -L -o chainsaw.tar.gz https://github.com/kyverno/chainsaw/releases/download/${CHAINSAW_VERSION}/chainsaw_linux_amd64.tar.gz \
+    && tar -xzf chainsaw.tar.gz \
+    && chmod +x chainsaw \
+    && mv chainsaw /usr/local/bin/ \
+    && rm -f chainsaw.tar.gz \
+    && curl -L -o oc.tar.gz https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest/openshift-client-linux-amd64-rhel8.tar.gz \
+    && tar -xvzf oc.tar.gz \
+    && chmod +x oc kubectl \
+    && mv oc kubectl /usr/local/bin/ \
+    && rm -f oc.tar.gz
+
+# Install logcli
+RUN curl -LO https://github.com/grafana/loki/releases/latest/download/logcli-linux-amd64.zip \
+    && unzip logcli-linux-amd64.zip \
+    && chmod +x logcli-linux-amd64 \
+    && mv logcli-linux-amd64 /usr/local/bin/logcli \
+    && rm -f logcli-linux-amd64.zip
+
+# Install AWS CLI
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+    && unzip awscliv2.zip \
+    && ./aws/install
+
+# Install Azure CLI
+RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc \
+    && dnf install -y https://packages.microsoft.com/config/rhel/8/packages-microsoft-prod.rpm \
+    && dnf install -y azure-cli \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+# Install Google Cloud CLI
+RUN curl -LO https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz \
+    && tar -xf google-cloud-cli-linux-x86_64.tar.gz \
+    && ./google-cloud-sdk/install.sh -q \
+    && rm -f google-cloud-cli-linux-x86_64.tar.gz
+
+# Add gcloud to PATH
+ENV PATH="/tmp/google-cloud-sdk/bin:${PATH}"

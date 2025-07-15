@@ -1,67 +1,84 @@
 
 #!/bin/bash
 # This script checks the OpenTelemetry collector pod for the presence of Logs.
+# It continuously checks until logs are found or the script is terminated by timeout.
 
 # Define the label selector
 LABEL_SELECTOR="app.kubernetes.io/component=opentelemetry-collector"
 
-# Define the search strings
-SEARCH_STRING1='-> log.file.name: Str(app-log-plaintext.log)'
-SEARCH_STRING2='-> logger: Str(SVTLogger)'
-SEARCH_STRING3='-> message: Str('
-SEARCH_STRING4='-> time: Str('
-SEARCH_STRING5='-> sev: Str(INFO)'
-SEARCH_STRING6='Body: Str(.*SVTLogger - INFO - app-log-plaintext-'
+# Define the search strings for container operator format
+SEARCH_STRINGS=(
+  "log.file.path"
+  "SVTLogger"
+  "Body: Str(.*SVTLogger.*app-log-plaintext-"
+  "k8s.container.name: Str(app-log-plaintext)"
+  "k8s.namespace.name: Str(chainsaw-filelog)"
+)
 
-# Get the list of pods with the specified label
-PODS=$(kubectl -n $NAMESPACE get pods -l $LABEL_SELECTOR -o jsonpath='{.items[*].metadata.name}')
+# Function to check logs in all collector pods
+check_logs_in_collectors() {
+    echo "Checking logs in all collector instances..."
+    
+    # Get the list of pods with the specified label
+    PODS=($(kubectl -n $NAMESPACE get pods -l $LABEL_SELECTOR -o jsonpath='{.items[*].metadata.name}'))
+    
+    # Check if the PODS array is not empty
+    if [ ${#PODS[@]} -eq 0 ]; then
+        echo "No collector pods found with label: $LABEL_SELECTOR"
+        return 1
+    fi
+    
+    echo "Found collector pods: ${PODS[*]}"
+    
+    # Check each pod until we find all search strings
+    for POD in "${PODS[@]}"; do
+        echo "Checking logs in pod: $POD"
+        
+        # Get logs from the pod
+        LOGS=$(kubectl -n $NAMESPACE --tail=200 logs $POD 2>/dev/null)
+        
+        if [ $? -ne 0 ]; then
+            echo "Failed to get logs from pod: $POD"
+            continue
+        fi
+        
+        # Check if all search strings are present in this pod's logs
+        all_found=true
+        for STRING in "${SEARCH_STRINGS[@]}"; do
+            if echo "$LOGS" | grep -q -- "$STRING"; then
+                echo "✓ \"$STRING\" found in $POD"
+            else
+                all_found=false
+                break
+            fi
+        done
+        
+        # If all strings found in this pod, we're done
+        if $all_found; then
+            echo "SUCCESS: All required log strings found in collector instance $POD!"
+            return 0
+        fi
+    done
+    
+    echo "Not all log strings found in any collector instance."
+    return 1
+}
 
-# Initialize flags to track if strings are found
-FOUND1=false
-FOUND2=false
-FOUND3=false
-FOUND4=false
-FOUND5=false
-FOUND6=false
+# Main loop - continuously check until success or timeout
+echo "Starting continuous log checking for app-log-plaintext.log in collector instances..."
+echo "This will continue until logs are found or chainsaw timeout is reached..."
 
-# Loop through each pod and search for the strings in the logs
-for POD in $PODS; do
-    # Search for the first string
-    if ! $FOUND1 && kubectl -n $NAMESPACE --tail=100 logs $POD | grep -q -- "$SEARCH_STRING1"; then
-        echo "\"$SEARCH_STRING1\" found in $POD"
-        FOUND1=true
+ATTEMPT=1
+while true; do
+    echo ""
+    echo "=== Attempt $ATTEMPT ==="
+    
+    if check_logs_in_collectors; then
+        echo "Found logs for app-log-plaintext.log in collector instances."
+        exit 0
     fi
-    # Search for the second string
-    if ! $FOUND2 && kubectl -n $NAMESPACE --tail=100 logs $POD | grep -q -- "$SEARCH_STRING2"; then
-        echo "\"$SEARCH_STRING2\" found in $POD"
-        FOUND2=true
-    fi
-    # Search for the third string
-    if ! $FOUND3 && kubectl -n $NAMESPACE --tail=100 logs $POD | grep -q -- "$SEARCH_STRING3"; then
-        echo "\"$SEARCH_STRING3\" found in $POD"
-        FOUND3=true
-    fi
-    # Search for the fourth string
-    if ! $FOUND4 && kubectl -n $NAMESPACE --tail=100 logs $POD | grep -q -- "$SEARCH_STRING4"; then
-        echo "\"$SEARCH_STRING4\" found in $POD"
-        FOUND4=true
-    fi
-    # Search for the fifth string
-    if ! $FOUND5 && kubectl -n $NAMESPACE --tail=100 logs $POD | grep -q -- "$SEARCH_STRING5"; then
-        echo "\"$SEARCH_STRING5\" found in $POD"
-        FOUND5=true
-    fi
-    # Search for the sixth string
-    if ! $FOUND6 && kubectl -n $NAMESPACE --tail=100 logs $POD | grep -q -- "$SEARCH_STRING6"; then
-        echo "\"$SEARCH_STRING6\" found in $POD"
-        FOUND6=true
-    fi
+    
+    echo "Logs not yet available. Waiting 10 seconds before next check..."
+    sleep 10
+    ATTEMPT=$((ATTEMPT + 1))
 done
-
-# Check if any of the strings was not found
-if ! $FOUND1 || ! $FOUND2 || ! $FOUND3 || ! $FOUND4 || ! $FOUND5 || ! $FOUND6; then
-    echo "No logs found for app-log-plaintext.log in collector"
-    exit 1
-else
-    echo "Found logs for app-log-plaintext.log in collector."
-fi

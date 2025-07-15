@@ -4,7 +4,7 @@ metadata:
   name: clusterlogs-collector
   namespace: chainsaw-filelog
 status:
-  desiredNumberScheduled: 2
+  numberMisscheduled: 0
   (desiredNumberScheduled == numberReady): true
 
 ---

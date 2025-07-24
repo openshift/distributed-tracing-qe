@@ -25,7 +25,7 @@ spec:
     exporters:
       awsxray:
         num_workers: 2
-        endpoint: "xray.us-east-2.amazonaws.com"
+        endpoint: "https://xray.us-east-2.amazonaws.com"
         request_timeout_seconds: 30
         max_retries: 2
         no_verify_ssl: false

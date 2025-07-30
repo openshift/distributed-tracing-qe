@@ -12,68 +12,46 @@ The test validates that the Forward connector can:
 
 ## 📋 Test Resources
 
-### 1. OpenTelemetry Collector with Forward Connector
-```yaml
-apiVersion: opentelemetry.io/v1alpha1
-kind: OpenTelemetryCollector
-metadata:
-  name: otlp-forward-connector
-spec:
-  mode: deployment
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  config: |
-    receivers:
-      otlp/blue:
-        protocols:
-          http:
-      otlp/green:
-        protocols:
-          http:
-            endpoint: 0.0.0.0:4319
-    processors:
-      attributes/blue:
-        actions:
-        - key: otel_pipeline_tag
-          value: "blue"
-          action: insert
-      attributes/green:
-        actions:
-        - key: otel_pipeline_tag
-          value: "green"
-          action: insert
-      batch:
-    exporters:
-      debug:
-        verbosity: detailed
-    connectors:
-      forward:
-    service:
-      pipelines:
-        traces/blue:
-          receivers: [otlp/blue]
-          processors: [attributes/blue]
-          exporters: [forward]
-        traces/green:
-          receivers: [otlp/green]
-          processors: [attributes/green]
-          exporters: [forward]
-        traces:
-          receivers: [forward]
-          processors: [batch]
-          exporters: [debug]
-```
+The test uses the following key resources that are included in this directory:
+
+### 1. OpenTelemetry Collector Configuration
+- **File**: [`otel-forward-connector.yaml`](./otel-forward-connector.yaml)
+- **Contains**: OpenTelemetryCollector with Forward connector configuration
+- **Key Features**:
+  - Multiple OTLP receivers for blue and green pipelines
+  - Attribute processors for pipeline-specific tagging
+  - Forward connector for trace aggregation
+  - Unified output pipeline with batch processing
 
 ### 2. Trace Generators
-The test generates traces with different operation names:
-- `lets-go` - Sent to blue pipeline
-- `okey-dokey` - Sent to green pipeline
+- **File**: [`generate-traces.yaml`](./generate-traces.yaml)
+- **Contains**: Job that generates test traces for both pipelines
+- **Key Features**:
+  - Creates traces with operation name `lets-go` for blue pipeline
+  - Creates traces with operation name `okey-dokey` for green pipeline
+  - Tests forward connector aggregation capabilities
+
+### 3. Verification Script
+- **File**: [`check_logs.sh`](./check_logs.sh)
+- **Purpose**: Validates forward connector behavior and trace aggregation
+- **Verification Criteria**:
+  - Confirms pipeline-specific attributes are added correctly
+  - Validates traces from both pipelines appear in unified output
+  - Checks trace operation names are preserved
+
+### 4. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Create OTEL Collector** - Deploy collector with forward connector configuration
-2. **Generate Traces** - Send traces to both blue and green pipelines
-3. **Wait for Processing** - Allow 10 seconds for traces to be processed and forwarded
-4. **Check Traces** - Verify traces from both pipelines appear in the output with correct attributes
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Create OTEL Collector** - Deploy from [`otel-forward-connector.yaml`](./otel-forward-connector.yaml)
+2. **Generate Traces** - Run job from [`generate-traces.yaml`](./generate-traces.yaml)
+3. **Wait for Processing** - Allow time for traces to be processed and forwarded
+4. **Check Traces** - Execute [`check_logs.sh`](./check_logs.sh) validation script
 
 ## 🔍 Forward Connector Architecture
 
@@ -103,7 +81,12 @@ Green OTLP → attributes/green → forward ↗
 
 ## 🔍 Verification
 
-The test verification script checks for the presence of:
+The verification is handled by [`check_logs.sh`](./check_logs.sh), which:
+- Monitors collector output logs for evidence of forward connector operation
+- Validates that traces from both pipelines are processed correctly
+- Confirms attribute processors add pipeline-specific tags
+
+**Expected Verification Points:**
 - `otel_pipeline_tag: Str(blue)` - Confirms blue pipeline processing
 - `otel_pipeline_tag: Str(green)` - Confirms green pipeline processing  
 - `Name           : lets-go` - Confirms blue trace operation name

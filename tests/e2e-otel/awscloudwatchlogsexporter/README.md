@@ -12,114 +12,61 @@ The test validates that the AWS CloudWatch exporters can:
 
 ## 📋 Test Resources
 
-### 1. AWS Credentials Secret
-The test creates an AWS credentials secret using the `create-aws-creds-secret.sh` script:
-```bash
-# Expected environment variables:
-# - AWS_ACCESS_KEY_ID
-# - AWS_SECRET_ACCESS_KEY
-```
+The test uses the following key resources that are included in this directory:
 
-### 2. OpenTelemetry Collector with AWS CloudWatch Exporters
-```yaml
-apiVersion: opentelemetry.io/v1beta1
-kind: OpenTelemetryCollector
-metadata:
-  name: cwlogs
-spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  env:
-    - name: AWS_ACCESS_KEY_ID
-      valueFrom:
-        secretKeyRef:
-          name: aws-credentials
-          key: access_key_id
-    - name: AWS_SECRET_ACCESS_KEY
-      valueFrom:
-        secretKeyRef:
-          name: aws-credentials
-          key: secret_access_key
-  config:
-    receivers:
-      otlp:
-        protocols:
-          grpc: {}
-          http: {}
+### 1. AWS Credentials Setup
+- **File**: [`create-aws-creds-secret.sh`](./create-aws-creds-secret.sh)
+- **Purpose**: Creates Kubernetes secret with AWS credentials
+- **Sources**: CLUSTER_PROFILE_DIR, kube-system aws-creds secret, or AWS CLI configuration
+- **Output**: Creates `aws-credentials` secret in test namespace
 
-    exporters:
-      debug:
-        verbosity: detailed
-      awsemf:
-        log_group_name: ($log_group_name)
-        log_stream_name: ($log_stream_name)
-        log_retention: 1
-        tags: { 'tracing-otel': 'true'}
-        namespace: "Tracing-EMF"
-        endpoint: "https://logs.us-east-2.amazonaws.com"
-        no_verify_ssl: false
-        region: "us-east-2"
-        max_retries: 1
-        dimension_rollup_option: "ZeroAndSingleDimensionRollup"
-        resource_to_telemetry_conversion:
-          enabled: true
-        output_destination: "cloudwatch"
-        detailed_metrics: false
-        parse_json_encoded_attr_values: []
-        metric_declarations: []
-        metric_descriptors: []
-        retain_initial_value_of_delta_metric: false
-      awscloudwatchlogs:
-        log_group_name: ($log_group_name)
-        log_stream_name: ($log_stream_name)
-        raw_log: true
-        region: "us-east-2"
-        endpoint: "https://logs.us-east-2.amazonaws.com"
-        log_retention: 1
-        tags: { 'tracing-otel': 'true'}
+### 2. OpenTelemetry Collector Configuration  
+- **File**: [`otel-collector.yaml`](./otel-collector.yaml)
+- **Contains**: Main collector with AWS CloudWatch and EMF exporters
+- **Key Features**:
+  - AWS CloudWatch Logs exporter for log aggregation
+  - AWS EMF (Embedded Metric Format) exporter for metrics
+  - Configurable log groups and streams via template parameters
+  - Batch processing for optimal performance
 
-    processors:
-      batch: {}
+### 3. OpenTelemetry Sidecar Configuration
+- **File**: [`otel-filelog-sidecar.yaml`](./otel-filelog-sidecar.yaml)  
+- **Contains**: Sidecar collector for application log collection
+- **Key Features**:
+  - FileLog receiver for container log collection
+  - OTLP exporter to forward logs to main collector
+  - DaemonSet deployment for node-level log collection
 
-    service:
-      pipelines:
-        logs:
-          receivers: [otlp]
-          processors: [batch]
-          exporters: [awscloudwatchlogs]
-        metrics:
-          receivers: [otlp]
-          processors: [batch]
-          exporters: [awsemf,debug]
-```
+### 4. Application Log Generator
+- **File**: [`app-plaintext-logs.yaml`](./app-plaintext-logs.yaml)
+- **Contains**: ReplicationController and ConfigMap for log generation
+- **Purpose**: Generates test logs for CloudWatch validation
 
-### 3. RBAC and Namespace Configuration
-The test sets up OpenShift-specific RBAC and namespace annotations:
-```bash
-# Role binding for pod view access
-kubectl create rolebinding default-view-$NAMESPACE --role=pod-view --serviceaccount=$NAMESPACE:ta
+### 5. Metrics Generator
+- **File**: [`generate-metrics.yaml`](./generate-metrics.yaml)
+- **Contains**: Job that generates test metrics
+- **Purpose**: Creates metrics for EMF export validation
 
-# Namespace annotations for OpenShift
-kubectl annotate namespace ${NAMESPACE} openshift.io/sa.scc.uid-range=1000/1000 --overwrite
-kubectl annotate namespace ${NAMESPACE} openshift.io/sa.scc.supplemental-groups=3000/1000 --overwrite
-```
+### 6. Verification Script
+- **File**: [`check_logs_metrics.sh`](./check_logs_metrics.sh)
+- **Purpose**: Validates logs and metrics are properly exported to AWS CloudWatch
+- **Verification**: Checks CloudWatch Logs and CloudWatch Metrics for expected data
 
-### 4. Sidecar Log Collection
-The test configures a sidecar OTEL collector to collect application logs and forward them to the main collector.
-
-### 5. Application Log Generator
-The test includes an application that generates plaintext logs to be collected and sent to CloudWatch.
-
-### 6. Metrics Generator
-The test includes a metrics generator job that sends test metrics for EMF export.
+### 7. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Create AWS Credentials Secret** - Set up AWS authentication using the credential script
-2. **Create OTEL Collector** - Deploy main collector with AWS CloudWatch exporters
-3. **Create OTEL Sidecar** - Deploy sidecar collector for log collection with namespace RBAC
-4. **Create Log Generator App** - Deploy application that generates test logs
-5. **Generate Metrics** - Send test metrics to the collector
-6. **Check CloudWatch** - Verify logs and metrics are received in AWS CloudWatch
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Create AWS Credentials Secret** - Run [`create-aws-creds-secret.sh`](./create-aws-creds-secret.sh)
+2. **Create OTEL Collector** - Deploy from [`otel-collector.yaml`](./otel-collector.yaml)  
+3. **Create OTEL Sidecar** - Deploy from [`otel-filelog-sidecar.yaml`](./otel-filelog-sidecar.yaml)
+4. **Create Log Generator App** - Deploy from [`app-plaintext-logs.yaml`](./app-plaintext-logs.yaml)
+5. **Generate Metrics** - Run job from [`generate-metrics.yaml`](./generate-metrics.yaml)
+6. **Check CloudWatch** - Execute [`check_logs_metrics.sh`](./check_logs_metrics.sh) validation script
 
 ## 🔍 AWS CloudWatch Configuration
 
@@ -145,10 +92,11 @@ The test includes a metrics generator job that sends test metrics for EMF export
 
 ## 🔍 Verification
 
-The test verification script checks that:
-- Log groups and streams are created in AWS CloudWatch Logs
-- Application logs are successfully exported and visible in CloudWatch
-- Metrics are exported in EMF format and visible in CloudWatch Metrics
+The verification is handled by [`check_logs_metrics.sh`](./check_logs_metrics.sh), which:
+- Validates log groups and streams are created in AWS CloudWatch Logs
+- Confirms application logs are successfully exported and visible in CloudWatch
+- Verifies metrics are exported in EMF format and visible in CloudWatch Metrics
+- Uses AWS CLI commands to query CloudWatch APIs for validation
 
 ## 🧹 Cleanup
 

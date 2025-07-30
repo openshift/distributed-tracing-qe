@@ -11,113 +11,40 @@ The test validates that the Journald receiver can:
 
 ## 📋 Test Resources
 
-### 1. Namespace
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: chainsaw-journald
-  labels:
-    security.openshift.io/scc.podSecurityLabelSync: "false"
-    pod-security.kubernetes.io/enforce: "privileged"
-    pod-security.kubernetes.io/audit: "privileged"
-    pod-security.kubernetes.io/warn: "privileged"
-```
+The test uses the following key resources that are included in this directory:
 
-### 2. ServiceAccount
-```yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: privileged-sa
-  namespace: chainsaw-journald
-```
+### 1. OpenTelemetry Collector Configuration
+- **File**: [`otel-journaldreceiver.yaml`](./otel-journaldreceiver.yaml)
+- **Contains**: DaemonSet OpenTelemetryCollector with Journald receiver
+- **Key Features**:
+  - DaemonSet deployment for node-level journal log collection
+  - Privileged security context with SELinux type `spc_t`
+  - Host journal directory mount for accessing systemd logs
+  - Specific systemd unit filtering (kubelet.service, crio.service)
+  - Debug exporter for verification
+  - Master node tolerations for complete coverage
 
-### 3. ClusterRoleBinding
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: chainsaw-journald--binding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system:openshift:scc:privileged
-subjects:
-- kind: ServiceAccount
-  name: privileged-sa
-  namespace: chainsaw-journald
-```
+### 2. Verification Script
+- **File**: [`check_logs.sh`](./check_logs.sh)
+- **Purpose**: Validates Journald receiver functionality
+- **Verification**: Checks for systemd journal logs and specific fields
 
-### 4. OpenTelemetry Collector
-```yaml
-apiVersion: opentelemetry.io/v1alpha1
-kind: OpenTelemetryCollector
-metadata:
-  name: otel-joural-logs
-  namespace: chainsaw-journald
-spec:
-  mode: daemonset
-  image: registry.redhat.io/rhosdt/opentelemetry-collector-rhel8:latest
-  serviceAccount: privileged-sa
-  securityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-      - CHOWN
-      - DAC_OVERRIDE
-      - FOWNER
-      - FSETID
-      - KILL
-      - NET_BIND_SERVICE
-      - SETGID
-      - SETPCAP
-      - SETUID
-    readOnlyRootFilesystem: true
-    seLinuxOptions:
-      type: spc_t
-    seccompProfile:
-      type: RuntimeDefault
-  config: |
-    receivers:
-      journald:
-        files: /var/log/journal/*/*
-        units:
-          - kubelet.service
-          - crio.service
-    processors:
-    exporters:
-      debug:
-        verbosity: detailed
-    service:
-      pipelines:
-        logs:
-          receivers: [journald]
-          processors: []
-          exporters: [debug]
-  volumeMounts:
-  - name: journal-logs
-    mountPath: /var/log/journal/
-    readOnly: true
-  volumes:
-  - name: journal-logs
-    hostPath:
-      path: /var/log/journal
-  tolerations:
-  - key: node-role.kubernetes.io/master
-    operator: Exists
-    effect: NoSchedule
-```
+### 3. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Create OpenTelemetry Collector** - Deploy the collector with Journald receiver
-2. **Wait for Log Collection** - Allow 60 seconds for journal logs to be collected
-3. **Verify Log Collection** - Check that expected systemd journal logs are being collected
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Create OpenTelemetry Collector** - Deploy from [`otel-journaldreceiver.yaml`](./otel-journaldreceiver.yaml)
+2. **Wait for Log Collection** - Allow time for journal logs to be collected
+3. **Verify Log Collection** - Execute [`check_logs.sh`](./check_logs.sh) validation script
 
 ## 🔍 Verification
 
-The test verification script checks for these specific journal log fields:
+The verification is handled by [`check_logs.sh`](./check_logs.sh), which validates the collection of systemd journal logs by checking for specific fields:
 - `_SYSTEMD_UNIT` - Systemd unit information
 - `_UID` - User ID
 - `_HOSTNAME` - Hostname

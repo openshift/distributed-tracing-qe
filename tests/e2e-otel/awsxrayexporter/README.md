@@ -12,80 +12,53 @@ The test validates that the AWS X-Ray exporter can:
 
 ## 📋 Test Resources
 
-### 1. AWS Credentials Secret
-The test creates an AWS credentials secret using the `create-aws-creds-secret.sh` script:
-```bash
-# Expected environment variables:
-# - AWS_ACCESS_KEY_ID
-# - AWS_SECRET_ACCESS_KEY
-```
+The test uses the following key resources that are included in this directory:
 
-### 2. OpenTelemetry Collector with AWS X-Ray Exporter
-```yaml
-apiVersion: opentelemetry.io/v1beta1
-kind: OpenTelemetryCollector
-metadata:
-  name: xray
-spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  env:
-    - name: AWS_ACCESS_KEY_ID
-      valueFrom:
-        secretKeyRef:
-          name: aws-credentials
-          key: access_key_id
-    - name: AWS_SECRET_ACCESS_KEY
-      valueFrom:
-        secretKeyRef:
-          name: aws-credentials
-          key: secret_access_key
-  config:
-    receivers:
-      otlp:
-        protocols:
-          grpc: {}
-          http: {}
+### 1. AWS Credentials Setup Script
+- **File**: [`create-aws-creds-secret.sh`](./create-aws-creds-secret.sh)
+- **Purpose**: Creates Kubernetes secret with AWS credentials for X-Ray authentication
+- **Required Environment Variables**:
+  - `AWS_ACCESS_KEY_ID`
+  - `AWS_SECRET_ACCESS_KEY`
 
-    exporters:
-      awsxray:
-        num_workers: 2
-        endpoint: "https://xray.us-east-2.amazonaws.com"
-        request_timeout_seconds: 30
-        max_retries: 2
-        no_verify_ssl: false
-        region: "us-east-2"
-        local_mode: false
-        index_all_attributes: false
-        aws_log_groups: [ikanse=tracing-test]
-        telemetry:
-          enabled: true
-          include_metadata: true
-          hostname: "ocp-otel-collector"
-          instance_id: "otel-collector-xray"
+### 2. OpenTelemetry Collector Configuration
+- **File**: [`otel-collector.yaml`](./otel-collector.yaml)
+- **Contains**: OpenTelemetryCollector with AWS X-Ray exporter configuration
+- **Key Features**:
+  - AWS X-Ray exporter with performance tuning (2 workers, 30s timeout, 2 retries)
+  - Region-specific endpoint configuration (us-east-2)
+  - Telemetry metadata and AWS log group associations
+  - OTLP receiver for trace ingestion
 
-    processors: {}
-
-    service:
-      pipelines:
-        traces:
-          receivers: [otlp]
-          processors: []
-          exporters: [awsxray]
-```
-
-### 3. HotROD Application
-The test deploys the HotROD (Rides on Demand) demo application to generate realistic traces for X-Ray export.
+### 3. HotROD Application Deployment
+- **File**: [`install-hotrod.yaml`](./install-hotrod.yaml)
+- **Contains**: HotROD (Rides on Demand) demo application deployment
+- **Purpose**: Generates realistic distributed traces for X-Ray export testing
 
 ### 4. Trace Generator
-The test includes a trace generator job that sends additional test traces to the collector.
+- **File**: [`generate-traces.yaml`](./generate-traces.yaml)
+- **Contains**: Job that generates additional test traces
+- **Purpose**: Creates synthetic trace data to validate X-Ray export functionality
+
+### 5. Verification Script
+- **File**: [`check_traces.sh`](./check_traces.sh)
+- **Purpose**: Validates that traces are successfully exported to AWS X-Ray
+- **Verification**: Checks AWS CloudWatch X-Ray console for received traces
+
+### 6. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Create AWS Credentials Secret** - Set up AWS authentication using the credential script
-2. **Create OTEL Collector** - Deploy collector with AWS X-Ray exporter
-3. **Install HotROD App** - Deploy the rides-on-demand demo application  
-4. **Generate Traces** - Create traces using the trace generator
-5. **Check AWS X-Ray** - Verify traces are received in AWS CloudWatch X-Ray
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Create AWS Credentials Secret** - Execute [`create-aws-creds-secret.sh`](./create-aws-creds-secret.sh)
+2. **Create OTEL Collector** - Deploy from [`otel-collector.yaml`](./otel-collector.yaml)
+3. **Install HotROD App** - Deploy from [`install-hotrod.yaml`](./install-hotrod.yaml)
+4. **Generate Traces** - Run job from [`generate-traces.yaml`](./generate-traces.yaml)
+5. **Check AWS X-Ray** - Execute [`check_traces.sh`](./check_traces.sh) validation script
 
 ## 🔍 AWS X-Ray Configuration
 
@@ -113,7 +86,10 @@ The test includes a trace generator job that sends additional test traces to the
 
 ## 🔍 Verification
 
-The test verification script checks that traces are successfully received in AWS CloudWatch X-Ray console and can be queried and visualized.
+The verification is handled by [`check_traces.sh`](./check_traces.sh), which:
+- Validates traces are successfully exported to AWS X-Ray
+- Checks AWS CloudWatch X-Ray console for received traces
+- Confirms traces can be queried and visualized in AWS X-Ray service
 
 ## 🧹 Cleanup
 

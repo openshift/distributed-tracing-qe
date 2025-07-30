@@ -12,125 +12,55 @@ The test validates that the Load Balancing exporter can:
 
 ## 📋 Test Resources
 
-### 1. ServiceAccount and RBAC
-```yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chainsaw-lb
-  namespace: chainsaw-lb
+The test uses the following key resources that are included in this directory:
 
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: chainsaw-lb-role
-  namespace: chainsaw-lb
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - endpoints
-  verbs:
-  - list
-  - watch
-  - get
+### 1. Backend Collector Configuration
+- **File**: [`otel-loadbalancingexporter-backends.yaml`](./otel-loadbalancingexporter-backends.yaml)
+- **Contains**: OpenTelemetryCollector deployment with 5 replicas
+- **Key Features**:
+  - Multiple replica backend collectors for load distribution
+  - OTLP receiver for incoming traces
+  - Debug exporter for trace verification
+  - Headless service for service discovery
 
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: chainsaw-lb-rolebinding
-  namespace: chainsaw-lb
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: chainsaw-lb-role
-subjects:
-- kind: ServiceAccount
-  name: chainsaw-lb
-  namespace: chainsaw-lb
-```
+### 2. Load Balancing Collector Configuration
+- **File**: [`otel-loadbalancingexporter-lb.yaml`](./otel-loadbalancingexporter-lb.yaml)
+- **Contains**: ServiceAccount, Role, RoleBinding, and Load Balancing OpenTelemetryCollector
+- **Key Features**:
+  - Load balancing exporter with Kubernetes service discovery
+  - RBAC permissions for endpoint discovery
+  - Service-based routing for consistent load distribution
+  - OTLP receiver for trace ingestion
 
-### 2. Backend Collectors (5 replicas)
-```yaml
-apiVersion: opentelemetry.io/v1alpha1
-kind: OpenTelemetryCollector
-metadata:
-  name: chainsaw-lb-backends
-  namespace: chainsaw-lb
-spec:
-  replicas: 5
-  config: |
-    receivers:
-      otlp:
-        protocols:
-          grpc:
+### 3. Trace Generator
+- **File**: [`generate-traces.yaml`](./generate-traces.yaml)
+- **Contains**: Job for generating test traces with different service names
+- **Key Features**:
+  - Generates traces for three different services: blue, red, green
+  - Uses telemetrygen tool for trace generation
+  - Targets the load balancing collector endpoint
 
-    processors:
+### 4. Verification Script
+- **File**: [`check_logs.sh`](./check_logs.sh)
+- **Purpose**: Validates that load balancing works correctly
+- **Verification Criteria**:
+  - All three service names appear across backend pods
+  - Each service name appears in only one backend pod
+  - Routing consistency is maintained per service
 
-    exporters:
-      debug:
-        verbosity: detailed
-
-    service:
-      pipelines:
-        traces:
-          receivers: [otlp]
-          processors: []
-          exporters: [debug]
-```
-
-### 3. Load Balancing Collector
-```yaml
-apiVersion: opentelemetry.io/v1alpha1
-kind: OpenTelemetryCollector
-metadata:
-  name: chainsaw-lb
-  namespace: chainsaw-lb
-spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  serviceAccount: chainsaw-lb
-  config: |
-    receivers:
-      otlp:
-        protocols:
-          http:
-
-    processors:
-
-    exporters:
-      loadbalancing:
-        protocol:
-          otlp:
-            tls:
-              insecure: true
-        resolver:
-          k8s:
-            service: chainsaw-lb-backends-collector-headless.chainsaw-lb
-        routing_key: "service"
-
-    service:
-      pipelines:
-        traces:
-          receivers: [otlp]
-          processors: []
-          exporters: [loadbalancing]
-```
-
-### 4. Trace Generators
-The test generates traces with three different service names:
-- `telemetrygen-http-blue`
-- `telemetrygen-http-red`
-- `telemetrygen-http-green`
+### 5. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Create Backend Collectors** - Deploy 5 replica collector backends with debug exporters
-2. **Create Load Balancing Collector** - Deploy LB collector that uses K8s resolver for service discovery
-3. **Generate Traces** - Send traces with different service names to the LB collector
-4. **Wait for Processing** - Allow 5 seconds for traces to be distributed
-5. **Check Load Balancing** - Verify each service's traces appear in only one backend pod
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Create Backend Collectors** - Deploy from [`otel-loadbalancingexporter-backends.yaml`](./otel-loadbalancingexporter-backends.yaml)
+2. **Create Load Balancing Collector** - Deploy from [`otel-loadbalancingexporter-lb.yaml`](./otel-loadbalancingexporter-lb.yaml)
+3. **Generate Traces** - Run from [`generate-traces.yaml`](./generate-traces.yaml)
+4. **Verify Load Balancing** - Execute [`check_logs.sh`](./check_logs.sh) validation script
 
 ## 🔍 Load Balancing Configuration
 
@@ -151,22 +81,16 @@ The test generates traces with three different service names:
 
 ## 🔍 Verification
 
-The test verification script checks that:
-- All three required service names are present across the backend pods:
-  - `telemetrygen-http-blue`
-  - `telemetrygen-http-red` 
-  - `telemetrygen-http-green`
-- Each service name appears in only one backend pod (routing consistency)
-- No service appears in multiple pods (proper load balancing)
+The verification is handled by [`check_logs.sh`](./check_logs.sh), which:
+- Checks that all three required service names are present across backend pods
+- Validates each service name appears in only one backend pod (routing consistency)
+- Ensures no service appears in multiple pods (proper load balancing)
+- Confirms load balancing distribution across the 5 backend replicas
 
-Example verification output:
-```bash
-Service.name telemetrygen-http-blue found in pod chainsaw-lb-backends-collector-xxx
-Service.name telemetrygen-http-red found in pod chainsaw-lb-backends-collector-yyy
-Service.name telemetrygen-http-green found in pod chainsaw-lb-backends-collector-zzz
-Success: All required service names are present and each appears in only one pod
-Load balancing is working correctly!
-```
+**Expected Services:**
+- `telemetrygen-http-blue`
+- `telemetrygen-http-red`
+- `telemetrygen-http-green`
 
 ## 🧹 Cleanup
 
@@ -178,4 +102,5 @@ The test runs in the `chainsaw-lb` namespace and all resources are cleaned up au
 - Routes based on service name attribute for consistent routing per service
 - Requires specific RBAC permissions for endpoint discovery
 - Demonstrates horizontal scaling of trace processing across multiple collectors
-- Validates routing consistency ensuring traces from the same service go to the same backend 
+- Validates routing consistency ensuring traces from the same service go to the same backend
+- Uses headless service to enable direct pod-to-pod communication

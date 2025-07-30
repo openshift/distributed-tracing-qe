@@ -11,139 +11,39 @@ The test validates that the Kubernetes Cluster receiver can:
 
 ## 📋 Test Resources
 
-### 1. ServiceAccount
-```yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: opentelemetry
-    component: otel-collector
-  name: otel-k8s-cluster
-  namespace: default
-```
+The test uses the following key resources that are included in this directory:
 
-### 2. ClusterRole
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  labels:
-    app: opentelemetry
-    component: otel-collector
-  name: otel-k8s-cluster
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - events
-  - namespaces
-  - namespaces/status
-  - nodes
-  - nodes/spec
-  - pods
-  - pods/status
-  - replicationcontrollers
-  - replicationcontrollers/status
-  - resourcequotas
-  - services
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  - deployments
-  - replicasets
-  - statefulsets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - extensions
-  resources:
-  - daemonsets
-  - deployments
-  - replicasets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  - cronjobs
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - autoscaling
-  resources:
-  - horizontalpodautoscalers
-  verbs:
-  - get
-  - list
-  - watch
-```
+### 1. OpenTelemetry Collector Configuration
+- **File**: [`otel-k8sclusterreceiver.yaml`](./otel-k8sclusterreceiver.yaml)
+- **Contains**: OpenTelemetryCollector with Kubernetes Cluster receiver and RBAC
+- **Key Features**:
+  - Single collector instance for cluster-wide metrics
+  - Comprehensive RBAC permissions for Kubernetes API access
+  - Cluster receiver with 10-second collection intervals
+  - Access to nodes, pods, deployments, services, and other resources
+  - Debug exporter for verification
 
-### 3. ClusterRoleBinding
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    app: opentelemetry
-    component: otel-collector
-  name: otel-k8s-cluster
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: otel-k8s-cluster
-subjects:
-- kind: ServiceAccount
-  name: otel-k8s-cluster
-  namespace: default
-```
+### 2. Verification Script
+- **File**: [`check_logs.sh`](./check_logs.sh)
+- **Purpose**: Validates Kubernetes Cluster receiver functionality
+- **Verification**: Checks for cluster-level metrics in collector output
 
-### 4. OpenTelemetry Collector
-```yaml
-apiVersion: opentelemetry.io/v1alpha1
-kind: OpenTelemetryCollector
-metadata:
-  name: otel-k8s-cluster
-spec:
-  serviceAccount: otel-k8s-cluster
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  config: |
-    receivers:
-      k8s_cluster:
-        collection_interval: 10s
-    processors:
-    exporters:
-      debug:
-        verbosity: detailed
-    service:
-      pipelines:
-        metrics:
-          receivers: [k8s_cluster]
-          processors: []
-          exporters: [debug]
-```
+### 3. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Create OpenTelemetry Collector** - Deploy the collector with Kubernetes Cluster receiver
-2. **Wait for Metrics Collection** - Allow 60 seconds for metrics to be collected
-3. **Verify Metrics Collection** - Check that expected cluster metrics are being collected
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Create OpenTelemetry Collector** - Deploy from [`otel-k8sclusterreceiver.yaml`](./otel-k8sclusterreceiver.yaml)
+2. **Wait for Metrics Collection** - Allow time for cluster metrics to be collected
+3. **Verify Metrics Collection** - Execute [`check_logs.sh`](./check_logs.sh) validation script
 
 ## 🔍 Verification
 
-The test verification script checks for these specific cluster metrics:
+The verification is handled by [`check_logs.sh`](./check_logs.sh), which validates cluster metrics collection by checking for:
 - `k8s.node.allocatable_cpu` - Node allocatable CPU resources
 - `k8s.node.allocatable_memory` - Node allocatable memory resources
 - `k8s.node.condition_memory_pressure` - Node memory pressure condition

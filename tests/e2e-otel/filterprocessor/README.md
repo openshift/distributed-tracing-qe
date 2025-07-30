@@ -12,64 +12,46 @@ The test validates that the Filter processor can:
 
 ## 📋 Test Resources
 
-### 1. OpenTelemetry Collector with Filter Processor
-```yaml
-apiVersion: opentelemetry.io/v1beta1
-kind: OpenTelemetryCollector
-metadata:
-  name: filterprocessor
-spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  config:
-    receivers:
-      otlp:
-        protocols:
-          grpc: {}
-          http: {}
+The test uses the following key resources that are included in this directory:
 
-    exporters:
-      debug:
-        verbosity: detailed
-
-    processors:
-      filter:
-        error_mode: ignore
-        traces:
-          span:
-            - 'attributes["traces-env"] == "red"'
-            - 'resource.attributes["traces-colour"] == "red"'
-        metrics:
-          metric:
-              - 'name == "gen" and resource.attributes["metrics-colour"] == "red"'
-        logs:
-          log_record:
-            - 'IsMatch(body, "drop message")'
-
-    service:
-      pipelines:
-        traces:
-          receivers: [otlp]
-          processors: [filter]
-          exporters: [debug]
-        metrics:
-          receivers: [otlp]
-          processors: [filter]
-          exporters: [debug]
-        logs:
-          receivers: [otlp]
-          processors: [filter]
-          exporters: [debug]
-```
+### 1. OpenTelemetry Collector Configuration
+- **File**: [`otel-collector.yaml`](./otel-collector.yaml)
+- **Contains**: OpenTelemetryCollector with Filter processor configuration
+- **Key Features**:
+  - Filter processor with OTTL expressions for traces, metrics, and logs
+  - Error mode set to ignore for continued processing
+  - Debug exporter with detailed verbosity for verification
+  - Multi-pipeline configuration for all telemetry data types
 
 ### 2. Telemetry Data Generator
-The test generates traces, metrics, and logs with various attributes and content to test the filtering capabilities.
+- **File**: [`generate-telemetry-data.yaml`](./generate-telemetry-data.yaml)
+- **Contains**: Job that generates test traces, metrics, and logs
+- **Key Features**:
+  - Creates telemetry data with both "red" and "green" attributes
+  - Tests filter processor capabilities across all data types
+  - Includes various attribute combinations for comprehensive testing
+
+### 3. Verification Script
+- **File**: [`check_logs.sh`](./check_logs.sh)
+- **Purpose**: Validates filter processor behavior by checking output
+- **Verification Criteria**:
+  - Confirms "green" data passes through the filter
+  - Ensures "red" data is filtered out as expected
+  - Validates OTTL expression functionality
+
+### 4. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Create OTEL Collector** - Deploy collector with filter processor
-2. **Generate Telemetry Data** - Send traces, metrics, and logs with both "red" and "green" attributes
-3. **Wait for Processing** - Allow 5 seconds for telemetry data to be processed
-4. **Check Filtered Data** - Verify that only "green" data passes through while "red" data is filtered out
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Create OTEL Collector** - Deploy from [`otel-collector.yaml`](./otel-collector.yaml)
+2. **Generate Telemetry Data** - Run job from [`generate-telemetry-data.yaml`](./generate-telemetry-data.yaml)
+3. **Wait for Processing** - Allow time for telemetry data to be processed through the filter
+4. **Check Filtered Data** - Execute [`check_logs.sh`](./check_logs.sh) validation script
 
 ## 🔍 Filter Rules Applied
 
@@ -88,7 +70,10 @@ The test generates traces, metrics, and logs with various attributes and content
 
 ## 🔍 Verification
 
-The test verification script checks for:
+The verification is handled by [`check_logs.sh`](./check_logs.sh), which:
+- Checks collector output logs for evidence of filter processor behavior
+- Validates that expected data ("green" attributes) passes through
+- Confirms that unwanted data ("red" attributes) is filtered out
 
 **Expected Data (should be present):**
 - `logs-colour: Str(green)` - Green logs passed through

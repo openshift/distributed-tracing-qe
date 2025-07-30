@@ -13,123 +13,80 @@ The test validates that the OIDC Authentication Extension can:
 
 ## 📋 Test Resources
 
+The test uses the following key resources that are included in this directory:
+
 ### 1. Hydra OIDC Provider
-The test deploys Ory Hydra as the OAuth2/OIDC provider for authentication services.
+- **File**: [`install-hydra.yaml`](./install-hydra.yaml)
+- **Contains**: Deployment and Service for Ory Hydra OAuth2/OIDC provider
+- **Key Features**:
+  - OAuth2/OIDC token issuer and validation service
+  - Provides authentication services for the test environment
+  - Configured for development/testing scenarios
 
-### 2. Certificate Generation
-The test generates TLS certificates using the `generate_certs.sh` script and creates a ConfigMap with the certificates.
+### 2. Hydra Configuration Setup
+- **File**: [`setup-hydra.yaml`](./setup-hydra.yaml)
+- **Contains**: Job for configuring OAuth2 client in Hydra
+- **Key Features**:
+  - Creates OAuth2 client registration in Hydra
+  - Configures client credentials and audience settings
+  - Prepares authentication environment for collectors
 
-### 3. OIDC Server Collector
-```yaml
-apiVersion: opentelemetry.io/v1alpha1
-kind: OpenTelemetryCollector
-metadata:
-  name: chainsaw-oidc-server
-spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  mode: deployment
-  volumeMounts:
-  - mountPath: /certs
-    name: chainsaw-certs
-  volumes:
-  - configMap:
-      name: chainsaw-certs
-    name: chainsaw-certs
-  config: |
-    extensions:
-      oidc:
-        issuer_url: http://hydra:4444
-        audience: tenant1-oidc-client
+### 3. Certificate Management
+- **File**: [`generate_certs.sh`](./generate_certs.sh)
+- **Purpose**: Generates TLS certificates for secure communication
+- **Creates**: CA certificate, server certificate, and private keys
+- **Storage**: Certificates stored in ConfigMap for collector access
 
-    receivers:
-      otlp:
-        protocols:
-          grpc:
-            tls:
-              cert_file: /certs/server.crt
-              key_file: /certs/server.key
-            auth:
-              authenticator: oidc
+### 4. OIDC Server Collector
+- **File**: [`install-otel-oidc-server.yaml`](./install-otel-oidc-server.yaml)
+- **Contains**: OpenTelemetryCollector with OIDC authentication extension
+- **Key Features**:
+  - OIDC extension for validating incoming authentication tokens
+  - TLS-secured OTLP receiver with certificate authentication
+  - Debug exporter for trace verification
+  - Certificate volume mounts for TLS operation
 
-    processors:
+### 5. OIDC Client Collector
+- **File**: [`install-otel-oidc-client.yaml`](./install-otel-oidc-client.yaml)
+- **Contains**: OpenTelemetryCollector with OAuth2 client extension
+- **Key Features**:
+  - OAuth2 client extension for acquiring access tokens
+  - TLS-secured OTLP exporter with certificate validation
+  - OTLP receiver for trace ingestion
+  - Certificate volume mounts for TLS operation
 
-    exporters:
-      debug:
-        verbosity: detailed
+### 6. Trace Generator
+- **File**: [`generate-traces.yaml`](./generate-traces.yaml)
+- **Contains**: Job for generating test traces
+- **Key Features**:
+  - Generates traces to test authenticated communication
+  - Targets the client collector endpoint
+  - Validates end-to-end authentication flow
 
-    service:
-      extensions: [oidc]
-      pipelines:
-        traces:
-          receivers: [otlp]
-          processors: []
-          exporters: [debug]
-```
+### 7. Verification Script
+- **File**: [`check_logs.sh`](./check_logs.sh)
+- **Purpose**: Validates that OIDC authentication works correctly
+- **Verification Criteria**:
+  - Confirms traces are successfully transmitted with authentication
+  - Validates server collector receives authenticated requests
+  - Ensures OAuth2 client can obtain and use access tokens
 
-### 4. OIDC Client Collector
-```yaml
-apiVersion: opentelemetry.io/v1alpha1
-kind: OpenTelemetryCollector
-metadata:
-  name: chainsaw-oidc-client
-spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  mode: deployment
-  volumes:
-    - name: chainsaw-certs
-      configMap: 
-        name: chainsaw-certs
-  volumeMounts:
-    - name: chainsaw-certs
-      mountPath: /certs
-  config: |
-    extensions:
-      oauth2client:
-        client_id: tenant1-oidc-client
-        client_secret: ZXhhbXBsZS1hcHAtc2VjcmV0
-        endpoint_params:
-          audience: tenant1-oidc-client
-        token_url: http://hydra:4444/oauth2/token
-
-    receivers:
-      otlp:
-        protocols:
-          grpc:
-          http:
-
-    processors:
-
-    exporters:
-      otlp:
-        endpoint: chainsaw-oidc-server-collector:4317
-        tls:
-          insecure: false
-          ca_file: /certs/ca.crt
-        auth:
-          authenticator: oauth2client
-
-    service:
-      extensions: [oauth2client]
-      pipelines:
-        traces:
-          receivers: [otlp]
-          processors: []
-          exporters: [otlp]
-```
-
-### 5. Trace Generator
-The test generates traces that are sent to the client collector, which then forwards them to the server collector using OIDC authentication.
+### 8. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Install Hydra** - Deploy Ory Hydra OAuth2/OIDC provider
-2. **Setup OAuth2 Client** - Create OAuth2 client configuration in Hydra
-3. **Generate Certificates** - Create TLS certificates and ConfigMap for secure communication
-4. **Create OIDC Server Collector** - Deploy server collector with OIDC authentication extension
-5. **Create OIDC Client Collector** - Deploy client collector with OAuth2 client extension
-6. **Generate Traces** - Send traces to test the authenticated communication
-7. **Wait for Processing** - Allow 60 seconds for trace processing
-8. **Check Traces** - Verify traces are received by the server collector
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Install Hydra** - Deploy from [`install-hydra.yaml`](./install-hydra.yaml)
+2. **Setup OAuth2 Client** - Configure from [`setup-hydra.yaml`](./setup-hydra.yaml)
+3. **Generate Certificates** - Execute [`generate_certs.sh`](./generate_certs.sh) and create ConfigMap
+4. **Create OIDC Server Collector** - Deploy from [`install-otel-oidc-server.yaml`](./install-otel-oidc-server.yaml)
+5. **Create OIDC Client Collector** - Deploy from [`install-otel-oidc-client.yaml`](./install-otel-oidc-client.yaml)
+6. **Generate Traces** - Run from [`generate-traces.yaml`](./generate-traces.yaml)
+7. **Verify Authentication** - Execute [`check_logs.sh`](./check_logs.sh) validation script
 
 ## 🔍 Authentication Flow
 
@@ -155,14 +112,13 @@ The test generates traces that are sent to the client collector, which then forw
 
 ## 🔍 Verification
 
-The test verification confirms that:
-- Hydra OIDC provider is running and configured
-- OAuth2 client is properly registered with Hydra
-- TLS certificates are generated and mounted correctly
-- OIDC server collector can authenticate incoming requests
-- OAuth2 client collector can obtain and use access tokens
-- Traces are successfully transmitted with proper authentication
-- Server collector receives and processes the authenticated traces
+The verification is handled by [`check_logs.sh`](./check_logs.sh), which:
+- Confirms Hydra OIDC provider is running and configured
+- Validates OAuth2 client is properly registered with Hydra
+- Checks TLS certificates are generated and mounted correctly
+- Ensures OIDC server collector can authenticate incoming requests
+- Verifies OAuth2 client collector can obtain and use access tokens
+- Confirms traces are successfully transmitted with proper authentication
 
 ## 🧹 Cleanup
 
@@ -175,4 +131,5 @@ The test runs in the `chainsaw-oidcauthextension` namespace and all resources ar
 - Integrates TLS security with OIDC authentication for comprehensive security
 - Uses Hydra as a standard-compliant OAuth2/OIDC provider
 - Shows both server-side authentication validation and client-side token acquisition
-- Validates secure collector-to-collector communication patterns 
+- Validates secure collector-to-collector communication patterns
+- Requires certificate generation and proper volume mounting for TLS operation

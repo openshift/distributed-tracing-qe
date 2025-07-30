@@ -11,79 +11,54 @@ The test validates that the Transform processor can:
 
 ## 📋 Test Resources
 
-### 1. Tempo Monolithic Instance
-```yaml
-apiVersion: tempo.grafana.com/v1alpha1
-kind: TempoMonolithic
-metadata:
-  name: tprocssr
-spec:
-  jaegerui:
-    enabled: true
-  multitenancy:
-    enabled: false
-```
+The test uses the following key resources that are included in this directory:
+
+### 1. Tempo Instance
+- **File**: [`install-tempo.yaml`](./install-tempo.yaml)
+- **Contains**: TempoMonolithic deployment for trace storage
+- **Key Features**:
+  - Jaeger UI enabled for trace visualization and querying
+  - Multitenancy disabled for simplified configuration
+  - Receives transformed traces from OpenTelemetry collector
 
 ### 2. OpenTelemetry Collector with Transform Processor
-```yaml
-apiVersion: opentelemetry.io/v1beta1
-kind: OpenTelemetryCollector
-metadata:
-  name: tprocssr
-spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  config:
-    receivers:
-      otlp:
-        protocols:
-          grpc: {}
+- **File**: [`otel-collector.yaml`](./otel-collector.yaml)
+- **Contains**: OpenTelemetryCollector with transform processor configuration
+- **Key Features**:
+  - OTLP receiver for trace ingestion
+  - Transform processor with resource and span transformations
+  - OTLP exporter forwarding transformed traces to Tempo
+  - Error mode set to ignore for fault tolerance
 
-    exporters:
-      otlp:
-        endpoint: tempo-tprocssr.chainsaw-tprocssr.svc:4317
-        tls:
-          insecure: true
+### 3. Trace Generator
+- **File**: [`generate-traces.yaml`](./generate-traces.yaml)
+- **Contains**: Job for generating test traces with specific attributes
+- **Key Features**:
+  - Generates traces using telemetrygen with target attributes
+  - Creates traces with attributes that will be transformed
+  - Provides input data for transformation testing
 
-    processors:
-      transform:
-        error_mode: ignore
-        trace_statements:
-          - context: resource
-            statements:
-              - keep_keys(attributes, ["service.name", "X-Tenant", "otel.library.name"])
-              - set(attributes["X-Tenant"], "blue") where attributes["X-Tenant"] == "green"
-              - limit(attributes, 100, [])
-              - truncate_all(attributes, 4096)
-          - context: span
-            statements:
-              - set(attributes["net.peer.ip"], "5.6.7.8") where attributes["net.sock.peer.addr"] == "1.2.3.4"
-              - set(attributes["peer.service"], "modified-server") where attributes["peer.service"] == "telemetrygen-server"
-              - set(attributes["peer.service"], "modified-client") where attributes["peer.service"] == "telemetrygen-client"
-              - set(name, "modified-operation") where name == "okey-dokey-0"
-              - limit(attributes, 100, [])
-              - truncate_all(attributes, 4096)
+### 4. Trace Verification
+- **File**: [`verify-traces.yaml`](./verify-traces.yaml)
+- **Contains**: Job for verifying transformed traces in Tempo
+- **Key Features**:
+  - Queries Tempo via Jaeger API for trace verification
+  - Validates that transformations are applied correctly
+  - Confirms transformed traces are stored successfully
 
-    service:
-      pipelines:
-        traces:
-          receivers: [otlp]
-          processors: [transform]
-          exporters: [otlp]
-```
-
-### 3. Trace Generator Job
-The test uses a telemetrygen job to generate traces with specific attributes that will be transformed by the processor.
-
-### 4. Trace Verification Job
-The test verifies that traces are successfully transformed and stored in Tempo by querying the Jaeger API.
+### 5. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Create Tempo Instance** - Deploy Tempo monolithic instance for trace storage
-2. **Check Tempo Status** - Verify Tempo instance is ready
-3. **Create OTEL Collector** - Deploy collector with transform processor
-4. **Generate Traces** - Send traces with specific attributes to be transformed
-5. **Verify Traces** - Check that transformed traces are received in Tempo
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Create Tempo Instance** - Deploy from [`install-tempo.yaml`](./install-tempo.yaml)
+2. **Create OTEL Collector** - Deploy from [`otel-collector.yaml`](./otel-collector.yaml)
+3. **Generate Traces** - Run from [`generate-traces.yaml`](./generate-traces.yaml)
+4. **Verify Traces** - Execute from [`verify-traces.yaml`](./verify-traces.yaml)
 
 ## 🔍 Transform Rules Applied
 
@@ -102,6 +77,29 @@ The test verifies that traces are successfully transformed and stored in Tempo b
 - **limit**: Limits span attributes to 100 maximum
 - **truncate_all**: Truncates all span attribute values to 4096 characters
 
+## 🔍 Transform Processor Configuration
+
+### Error Handling:
+- **Error Mode**: `ignore` - Continue processing even if transformation errors occur
+- **Fault Tolerance**: Prevents pipeline failures due to transformation issues
+
+### Conditional Transformations:
+- Uses `where` clauses for targeted attribute modifications
+- Applies transformations only when specific conditions are met
+- Supports complex conditional logic for attribute manipulation
+
+### Context Levels:
+- **Resource Context**: Transformations applied to resource-level attributes
+- **Span Context**: Transformations applied to individual span attributes and names
+
+## 🔍 Verification
+
+The verification is handled by [`verify-traces.yaml`](./verify-traces.yaml), which:
+- Queries Tempo for transformed traces via Jaeger API
+- Validates that attribute transformations are applied correctly
+- Confirms conditional transformations work as expected
+- Ensures transformed traces are properly stored and accessible
+
 ## 🧹 Cleanup
 
 The test runs in the `chainsaw-tprocssr` namespace and all resources are cleaned up automatically when the test completes.
@@ -112,4 +110,5 @@ The test runs in the `chainsaw-tprocssr` namespace and all resources are cleaned
 - Applies transformations at both resource and span contexts
 - Uses conditional statements with `where` clauses for targeted transformations
 - Demonstrates attribute filtering, modification, limiting, and truncation
-- Integrates with Tempo for end-to-end trace verification 
+- Integrates with Tempo for end-to-end trace verification
+- Supports complex transformation logic with conditional execution

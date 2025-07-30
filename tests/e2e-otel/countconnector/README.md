@@ -12,88 +12,52 @@ The test validates that the Count connector can:
 
 ## 📋 Test Resources
 
-### 1. User Workload Monitoring Configuration
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cluster-monitoring-config
-  namespace: openshift-monitoring
-data:
-  config.yaml: |
-    enableUserWorkload: true
-```
+The test uses the following key resources that are included in this directory:
 
-### 2. OpenTelemetry Collector with Count Connector
-```yaml
-apiVersion: opentelemetry.io/v1beta1
-kind: OpenTelemetryCollector
-metadata:
-  name: count
-spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  mode: deployment
-  observability:
-    metrics:
-      enableMetrics: true
-  config:
-    receivers:
-      otlp:
-        protocols:
-          grpc: {}
-          http:  {}
-    processors: {}
-    connectors:
-      count:
-        logs:
-          dev.log.count:
-            description: The number of logs from each environment.
-            attributes:
-              - key: telemetrygentype
-                default_value: unspecified_environment
-        datapoints:
-          dev.metrics.datapoint:
-            description: The number of metric datapoints from each environment.
-            attributes:
-              - key: telemetrygentype
-                default_value: unspecified_environment
-        spans:
-          dev.span.count:
-            description: The number of spans from each environment.
-            attributes:
-              - key: telemetrygentype
-                default_value: unspecified_environment
-    exporters:
-      debug: {}
-      prometheus:
-        endpoint: 0.0.0.0:8889
-        resource_to_telemetry_conversion:
-          enabled: true # by default resource attributes are dropped
-    service:
-      pipelines:
-        traces:
-          receivers: [otlp]
-          exporters: [count]
-        metrics:
-          receivers: [otlp]
-          exporters: [count]
-        logs:
-          receivers: [otlp]
-          exporters: [count]
-        metrics/count:
-          receivers: [count]
-          exporters: [prometheus, debug]
-```
+### 1. OpenTelemetry Collector Configuration
+- **File**: [`otel-collector.yaml`](./otel-collector.yaml)
+- **Contains**: OpenTelemetryCollector with Count connector configuration
+- **Key Features**:
+  - Deployment mode with metrics observability enabled
+  - Count connector for logs, datapoints, and spans
+  - Prometheus exporter for metrics exposure
+  - Multi-pipeline architecture with count connector routing
+
+### 2. User Workload Monitoring Setup
+- **File**: [`workload-monitoring.yaml`](./workload-monitoring.yaml)
+- **Contains**: ConfigMap for enabling OpenShift user workload monitoring
+- **Purpose**: Enables Prometheus monitoring for user workloads in OpenShift
 
 ### 3. Telemetry Data Generator
-The test generates logs, metrics, and traces with the `telemetrygentype` attribute to test counting functionality.
+- **File**: [`generate-telemetry-data.yaml`](./generate-telemetry-data.yaml)
+- **Contains**: Job that generates test logs, metrics, and traces
+- **Key Features**:
+  - Generates telemetry data with `telemetrygentype` attributes
+  - Creates data for count connector testing
+  - Includes proper labeling for verification
+
+### 4. Verification Script
+- **File**: [`check_metrics.sh`](./check_metrics.sh)
+- **Purpose**: Validates count metrics are properly generated and exposed
+- **Verification Criteria**:
+  - `dev_log_count_total{telemetrygentype="logs"}` = 1
+  - `dev_metrics_datapoint_total{telemetrygentype="metrics"}` = 1
+  - `dev_span_count_total{telemetrygentype="traces"}` = 10
+  - Uses OpenShift Thanos querier for metric verification
+
+### 5. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Enable User Workload Monitoring** - Configure OpenShift cluster monitoring for user workloads
-2. **Create OTEL Collector** - Deploy collector with count connector and Prometheus exporter
-3. **Generate Telemetry Data** - Send traces, metrics, and logs to test counting
-4. **Verify Metrics** - Check count metrics are exposed and accessible via Thanos querier
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Enable User Workload Monitoring** - Deploy from [`workload-monitoring.yaml`](./workload-monitoring.yaml)
+2. **Create OTEL Collector** - Deploy from [`otel-collector.yaml`](./otel-collector.yaml)  
+3. **Generate Telemetry Data** - Run job from [`generate-telemetry-data.yaml`](./generate-telemetry-data.yaml)
+4. **Verify Metrics** - Execute [`check_metrics.sh`](./check_metrics.sh) validation script
 
 ## 🔍 Count Connector Configuration
 
@@ -125,16 +89,17 @@ The test generates logs, metrics, and traces with the `telemetrygentype` attribu
 
 ## 🔍 Verification
 
-The test verification script checks specific count metrics using OpenShift's Thanos querier:
+The verification is handled by [`check_metrics.sh`](./check_metrics.sh), which:
+- Queries OpenShift's Thanos API for count metrics
+- Uses OpenShift user workload monitoring token for authentication
+- Polls until expected metric values are found
+- Validates specific count metrics with proper attribute grouping
+
+**Expected Metrics:**
 - `dev_log_count_total{telemetrygentype="logs"}` = 1
 - `dev_metrics_datapoint_total{telemetrygentype="metrics"}` = 1  
 - `dev_span_count_total{telemetrygentype="traces"}` = 10
 - `metric_count_total{telemetrygentype="metrics"}` = 1
-
-The script uses:
-- OpenShift user workload monitoring token for authentication
-- Thanos querier API endpoint for metric queries
-- Polling mechanism to wait for expected metric values
 
 ## 🧹 Cleanup
 

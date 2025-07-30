@@ -12,114 +12,65 @@ The test validates a metric processing pipeline that:
 
 ## 📋 Test Resources
 
+The test uses the following key resources that are included in this directory:
+
 ### 1. User Workload Monitoring Configuration
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cluster-monitoring-config
-  namespace: openshift-monitoring
-data:
-  config.yaml: |
-    enableUserWorkload: true
-```
+- **File**: [`workload-monitoring.yaml`](./workload-monitoring.yaml)
+- **Contains**: ConfigMap to enable OpenShift user workload monitoring
+- **Purpose**: Enables Prometheus monitoring for user workloads
 
-### 2. ServiceAccount and RBAC
-```yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chainsaw-gba
-  namespace: chainsaw-gba
+### 2. Kubelet Stats Collector (DaemonSet)
+- **File**: [`otel-collector.yaml`](./otel-collector.yaml)
+- **Contains**: DaemonSet OpenTelemetryCollector for kubelet stats collection
+- **Key Features**:
+  - Service account authentication for kubelet access
+  - Node-based metric collection with 20-second intervals
+  - OTLP forwarding to main collector
+  - Master node tolerations for complete coverage
 
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: chainsaw-gba-role
-rules:
-  - apiGroups: ['']
-    resources: ['nodes/stats']
-    verbs: ['get', 'watch', 'list']
-  - apiGroups: [""]
-    resources: ["nodes/proxy"]
-    verbs: ["get"]
+### 3. Main Collector with Group By Attributes Processor
+- **File**: [`otel-groupbyattributes.yaml`](./otel-groupbyattributes.yaml)
+- **Contains**: Primary OpenTelemetryCollector with Group By Attributes processor
+- **Key Features**:
+  - Receives metrics from DaemonSet collectors
+  - Applies Group By Attributes processor for cardinality reduction
+  - Prometheus exporter for metrics exposure
+  - Debug exporter for verification
 
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: chainsaw-gba-binding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: chainsaw-gba-role
-subjects:
-  - kind: ServiceAccount
-    name: chainsaw-gba
-    namespace: chainsaw-gba
-```
+### 4. Monitoring View Role
+- **File**: [`monitoring-view-role.yaml`](./monitoring-view-role.yaml)
+- **Contains**: RBAC permissions for accessing metrics endpoints
+- **Purpose**: Enables verification script to query metrics
 
-### 3. Kubelet Stats Collector (DaemonSet)
-```yaml
-apiVersion: opentelemetry.io/v1alpha1
-kind: OpenTelemetryCollector
-metadata:
-  name: chainsaw-gba
-  namespace: chainsaw-gba
-spec:
-  mode: daemonset
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  serviceAccount: chainsaw-gba
-  env:
-  - name: K8S_NODE_NAME
-    valueFrom:
-      fieldRef:
-        fieldPath: spec.nodeName
-  config: |
-    receivers:
-      kubeletstats:
-        collection_interval: 20s
-        auth_type: "serviceAccount"
-        endpoint: "https://${env:K8S_NODE_NAME}:10250"
-        insecure_skip_verify: true
-    exporters:
-      otlp:
-        endpoint: gba-main-collector.chainsaw-gba.svc:4317
-        tls:
-          insecure: true
-    service:
-      pipelines:
-        metrics:
-          receivers: [kubeletstats]
-          exporters: [otlp]
-  tolerations:
-  - key: node-role.kubernetes.io/master
-    operator: Exists
-    effect: NoSchedule
-```
+### 5. Verification Script
+- **File**: [`check_metrics.sh`](./check_metrics.sh)
+- **Purpose**: Validates Group By Attributes processor functionality
+- **Verification**: Checks grouped metrics via Prometheus endpoint
 
-### 4. Main Collector with Group By Attributes Processor
-The test includes a main collector that receives metrics from the DaemonSet collectors and applies the Group By Attributes processor to organize and reduce metric cardinality.
-
-### 5. Monitoring View Role
-The test creates appropriate RBAC permissions to access metrics endpoints for verification.
+### 6. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Enable User Workload Monitoring** - Configure OpenShift cluster monitoring
-2. **Create Kubelet Stats Collector** - Deploy DaemonSet to collect node metrics
-3. **Create Main Collector with Group By Attributes** - Deploy central collector for processing
-4. **Check Metrics** - Create monitoring role and verify grouped metrics
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Enable User Workload Monitoring** - Deploy from [`workload-monitoring.yaml`](./workload-monitoring.yaml)
+2. **Create Kubelet Stats Collector** - Deploy from [`otel-collector.yaml`](./otel-collector.yaml)
+3. **Create Main Collector with Group By Attributes** - Deploy from [`otel-groupbyattributes.yaml`](./otel-groupbyattributes.yaml)
+4. **Create Monitoring Role** - Deploy from [`monitoring-view-role.yaml`](./monitoring-view-role.yaml)
+5. **Check Metrics** - Execute [`check_metrics.sh`](./check_metrics.sh) validation script
 
 ## 🔍 Verification
 
-The test verification checks that:
-- Kubelet stats metrics are successfully collected from all nodes
-- Metrics are forwarded to the main collector
-- Group By Attributes processor successfully groups metrics
-- Processed metrics are available via Prometheus endpoint
-- Metric cardinality is appropriately reduced through grouping
+The verification is handled by [`check_metrics.sh`](./check_metrics.sh), which:
+- Queries the main collector's Prometheus endpoint
+- Validates that kubelet stats metrics are properly collected
+- Confirms Group By Attributes processor is functioning
+- Checks that metrics are forwarded from DaemonSet collectors
+- Verifies metric cardinality reduction through attribute grouping
+- Ensures processed metrics are available for monitoring
 
 ## 🧹 Cleanup
 

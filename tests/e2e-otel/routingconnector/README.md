@@ -12,82 +12,55 @@ The test validates that the Routing connector can:
 
 ## 📋 Test Resources
 
-### 1. Multiple Tempo Instances
-The test deploys three separate Tempo monolithic instances:
-- `red` - for traces with X-Tenant=red
-- `blue` - for traces with X-Tenant=blue  
-- `green` - for traces with no matching tenant (default)
+The test uses the following key resources that are included in this directory:
+
+### 1. Tempo Instances
+- **File**: [`install-tempo.yaml`](./install-tempo.yaml)
+- **Contains**: Three separate TempoMonolithic instances
+- **Key Features**:
+  - `red` - for traces with X-Tenant=red
+  - `blue` - for traces with X-Tenant=blue
+  - `green` - for traces with no matching tenant (default)
+  - Jaeger UI enabled for trace verification
 
 ### 2. OpenTelemetry Collector with Routing Connector
-```yaml
-apiVersion: opentelemetry.io/v1beta1
-kind: OpenTelemetryCollector
-metadata:
-  name: routing
-spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  config:
-    receivers:
-      otlp:
-        protocols:
-          grpc: {}
+- **File**: [`otel-collector.yaml`](./otel-collector.yaml)
+- **Contains**: OpenTelemetryCollector with routing connector configuration
+- **Key Features**:
+  - OTLP receiver for trace ingestion
+  - Routing connector with conditional routing logic
+  - Multiple OTLP exporters for different Tempo instances
+  - Multi-pipeline architecture for tenant isolation
 
-    exporters:
-      otlp/red:
-        endpoint: tempo-red.chainsaw-routecnctr.svc:4317
-        tls:
-          insecure: true
-      otlp/green:
-        endpoint: tempo-green.chainsaw-routecnctr.svc:4317
-        tls:
-          insecure: true
-      otlp/blue:
-        endpoint: tempo-blue.chainsaw-routecnctr.svc:4317
-        tls:
-          insecure: true
+### 3. Trace Generator
+- **File**: [`generate-traces.yaml`](./generate-traces.yaml)
+- **Contains**: Job for generating test traces with different tenant attributes
+- **Key Features**:
+  - Generates traces with various X-Tenant values
+  - Tests routing logic for all tenant scenarios
+  - Creates traces for red, blue, and default routing
 
-    processors:
+### 4. Trace Verification
+- **File**: [`verify-traces.yaml`](./verify-traces.yaml)
+- **Contains**: Job for verifying traces are routed correctly
+- **Key Features**:
+  - Queries each Tempo instance for expected traces
+  - Validates routing logic works correctly
+  - Confirms tenant isolation
 
-    connectors:
-      routing:
-        error_mode: ignore
-        default_pipelines: [traces/green]
-        table:
-          - statement: route() where attributes["X-Tenant"] == "red"
-            pipelines: [traces/red]
-          - statement: route() where attributes["X-Tenant"] == "blue"
-            pipelines: [traces/blue]
-
-    service:
-      pipelines:
-        traces/in:
-          receivers: [otlp]
-          processors: []
-          exporters: [routing]
-        traces/red:
-          receivers: [routing]
-          processors: []
-          exporters: [otlp/red]
-        traces/blue:
-          receivers: [routing]
-          processors: []
-          exporters: [otlp/blue]
-        traces/green:
-          receivers: [routing]
-          processors: []
-          exporters: [otlp/green]
-```
-
-### 3. Trace Generators
-The test generates traces with different tenant attributes to test the routing logic.
+### 5. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Create Tempo Instances** - Deploy three Tempo monolithic instances (red, blue, green)
-2. **Check Tempo Status** - Verify all three Tempo instances are ready
-3. **Create OTEL Collector** - Deploy collector with routing connector
-4. **Generate Traces** - Send traces with different X-Tenant attributes
-5. **Verify Traces** - Check that traces are routed to the correct Tempo instances
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Create Tempo Instances** - Deploy from [`install-tempo.yaml`](./install-tempo.yaml)
+2. **Create OTEL Collector** - Deploy from [`otel-collector.yaml`](./otel-collector.yaml)
+3. **Generate Traces** - Run from [`generate-traces.yaml`](./generate-traces.yaml)
+4. **Verify Traces** - Execute from [`verify-traces.yaml`](./verify-traces.yaml)
 
 ## 🔍 Routing Logic
 
@@ -115,11 +88,11 @@ The test generates traces with different tenant attributes to test the routing l
 
 ## 🔍 Verification
 
-The test verification confirms that:
-- Traces with `X-Tenant=red` are stored in the red Tempo instance
-- Traces with `X-Tenant=blue` are stored in the blue Tempo instance
-- Traces without X-Tenant or with other values are stored in the green Tempo instance
-- All routing rules function correctly and traces reach their intended destinations
+The verification is handled by [`verify-traces.yaml`](./verify-traces.yaml), which:
+- Confirms traces with `X-Tenant=red` are stored in the red Tempo instance
+- Validates traces with `X-Tenant=blue` are stored in the blue Tempo instance
+- Ensures traces without X-Tenant or with other values are stored in the green Tempo instance
+- Verifies all routing rules function correctly and traces reach their intended destinations
 
 ## 🧹 Cleanup
 
@@ -131,4 +104,5 @@ The test runs in the `chainsaw-routecnctr` namespace and all resources are clean
 - Supports default routing for traces that don't match specific conditions
 - Demonstrates fan-out from single input to multiple output pipelines
 - Each routing rule can target different processing pipelines and exporters
-- Enables tenant isolation by routing traces to separate backend systems 
+- Enables tenant isolation by routing traces to separate backend systems
+- Uses attribute-based routing with conditional expressions for flexible routing logic

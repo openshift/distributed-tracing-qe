@@ -11,109 +11,40 @@ The test validates that the HostMetrics receiver can:
 
 ## 📋 Test Resources
 
-### 1. ServiceAccount
-```yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: otel-hostfs-daemonset
-  namespace: chainsaw-hostmetrics
-```
+The test uses the following key resources that are included in this directory:
 
-### 2. SecurityContextConstraints (SCC)
-```yaml
-apiVersion: security.openshift.io/v1
-kind: SecurityContextConstraints
-allowHostDirVolumePlugin: true
-allowHostIPC: false
-allowHostNetwork: false
-allowHostPID: true
-allowHostPorts: false
-allowPrivilegeEscalation: true
-allowPrivilegedContainer: true
-allowedCapabilities: null
-defaultAddCapabilities:
-- SYS_ADMIN
-fsGroup:
-  type: RunAsAny
-groups: []
-metadata:
-  name: otel-hostmetrics
-readOnlyRootFilesystem: true
-runAsUser:
-  type: RunAsAny
-seLinuxContext:
-  type: RunAsAny
-supplementalGroups:
-  type: RunAsAny
-users:
-- system:serviceaccount:chainsaw-hostmetrics:otel-hostfs-daemonset
-volumes:
-- configMap
-- emptyDir
-- hostPath
-- projected
-```
+### 1. OpenTelemetry Collector Configuration
+- **File**: [`otel-hostmetricsreceiver.yaml`](./otel-hostmetricsreceiver.yaml)
+- **Contains**: DaemonSet OpenTelemetryCollector with HostMetrics receiver
+- **Key Features**:
+  - DaemonSet deployment for node-level metric collection
+  - Privileged security context for host filesystem access
+  - Host filesystem mount at `/hostfs` for accurate metrics
+  - Comprehensive metric scrapers (CPU, memory, disk, network, etc.)
+  - Debug exporter for verification
+  - Master node tolerations for complete coverage
 
-### 3. OpenTelemetry Collector
-```yaml
-apiVersion: opentelemetry.io/v1alpha1
-kind: OpenTelemetryCollector
-metadata:
-  name: otel-hstmtrs
-spec:
-  mode: daemonset
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  serviceAccount: otel-hostfs-daemonset
-  config: |
-    receivers:
-      hostmetrics:
-        root_path: /hostfs
-        collection_interval: 10s
-        scrapers:
-          cpu:
-          load:
-          memory:
-          disk:
-          filesystem:
-          network:
-          paging:
-          processes:
-          process:
-    processors:
-    exporters:
-      debug:
-        verbosity: detailed
-    service:
-      pipelines:
-        metrics:
-          receivers: [hostmetrics]
-          processors: []
-          exporters: [debug]
-  volumeMounts:
-  - name: hostfs
-    mountPath: /hostfs
-    readOnly: true
-    mountPropagation: HostToContainer
-  volumes:
-  - name: hostfs
-    hostPath:
-      path: /
-  tolerations:
-  - key: node-role.kubernetes.io/master
-    operator: Exists
-    effect: NoSchedule
-```
+### 2. Verification Script
+- **File**: [`check_logs.sh`](./check_logs.sh)
+- **Purpose**: Validates HostMetrics receiver functionality
+- **Verification**: Checks for comprehensive host system metrics in collector output
+
+### 3. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Create OpenTelemetry Collector** - Deploy the collector with HostMetrics receiver
-2. **Wait for Metrics Collection** - Allow 60 seconds for metrics to be collected
-3. **Verify Metrics Collection** - Check that expected metrics are being collected
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Create OpenTelemetry Collector** - Deploy from [`otel-hostmetricsreceiver.yaml`](./otel-hostmetricsreceiver.yaml)
+2. **Wait for Metrics Collection** - Allow time for host metrics to be collected
+3. **Verify Metrics Collection** - Execute [`check_logs.sh`](./check_logs.sh) validation script
 
 ## 🔍 Verification
 
-The test verification script checks for these specific metrics:
+The verification is handled by [`check_logs.sh`](./check_logs.sh), which validates the collection of comprehensive host metrics including:
 
 **Process Metrics:**
 - `process.pid` - Process ID

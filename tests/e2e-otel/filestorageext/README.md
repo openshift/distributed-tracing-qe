@@ -13,106 +13,46 @@ The test validates that the File Storage Extension can:
 
 ## 📋 Test Resources
 
-### 1. Namespace RBAC and Security Configuration
-The test configures OpenShift-specific security settings:
-```bash
-# Role binding for pod view access
-kubectl create rolebinding default-view-$NAMESPACE --role=pod-view --serviceaccount=$NAMESPACE:ta
+The test uses the following key resources that are included in this directory:
 
-# Security context constraints
-kubectl annotate namespace ${NAMESPACE} openshift.io/sa.scc.uid-range=1000/1000 --overwrite
-kubectl annotate namespace ${NAMESPACE} openshift.io/sa.scc.supplemental-groups=3000/1000 --overwrite
-```
+### 1. Main OpenTelemetry Collector Configuration
+- **File**: [`otel-filestorageext.yaml`](./otel-filestorageext.yaml)
+- **Contains**: Primary OpenTelemetry Collector with debug exporter
+- **Key Features**:
+  - Deployment mode for receiving forwarded logs
+  - OTLP receiver for log ingestion
+  - Debug exporter with detailed verbosity for verification
 
-### 2. Main Collector (Debug Output)
-```yaml
-apiVersion: opentelemetry.io/v1alpha1
-kind: OpenTelemetryCollector
-metadata:
-  name: filestorageext
-spec:
-  mode: deployment
-  config: |
-    receivers:
-      otlp:
-        protocols:
-          grpc:
-          http:
-    processors:
-    exporters:
-      debug:
-        verbosity: detailed
-    service:
-      pipelines:
-        logs:
-          receivers: [otlp]
-          processors: []
-          exporters: [debug]
-```
+### 2. Sidecar Collector with File Storage Extension
+- **File**: [`app-plaintest-logs.yaml`](./app-plaintest-logs.yaml)
+- **Contains**: Application deployment with sidecar collector configuration
+- **Key Features**:
+  - File storage extension for persistent state management
+  - Filelog receiver with regex parsing for structured logs
+  - Compaction configuration for storage optimization
+  - Volume mounts for log data and storage directories
+  - OTLP exporter for forwarding logs to main collector
 
-### 3. Sidecar Collector with File Storage Extension
-```yaml
-apiVersion: opentelemetry.io/v1alpha1
-kind: OpenTelemetryCollector
-metadata:
-  name: filestorageext-sidecar
-spec:
-  mode: sidecar
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  config: |
-    receivers:
-      filelog:
-        storage: file_storage
-        include: [ /log-data/*.log ]
-        operators:
-          - type: regex_parser
-            regex: '^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - (?P<logger>\S+) - (?P<sev>\S+) - (?P<message>.*)$'
-            timestamp:
-              parse_from: attributes.time
-              layout: '%Y-%m-%d %H:%M:%S'
-            severity:
-              parse_from: attributes.sev
-    processors:
-    exporters:
-      otlp:
-        endpoint: filestorageext-collector:4317
-        tls:
-          insecure: true
-    extensions:
-      file_storage:
-        directory: /filestorageext/data
-        timeout: 1s
-        compaction:
-          on_start: true
-          directory: /filestorageext/compaction
-          max_transaction_size: 65_536
-        fsync: true
-    service:
-      extensions: [file_storage]
-      pipelines:
-        logs:
-          receivers: [filelog]
-          processors: []
-          exporters: [otlp]
-  volumeMounts:
-  - name: log-data
-    mountPath: /log-data
-  - name: filestorageext
-    mountPath: /filestorageext/data
-  - name: filestorageext
-    mountPath: /filestorageext/compaction
-```
+### 3. Verification Scripts
+- **File**: [`check_logs.sh`](./check_logs.sh)
+- **Purpose**: Validates that logs are properly collected and processed through the file storage extension
+- **File**: [`check_filestorageext.sh`](./check_filestorageext.sh)
+- **Purpose**: Verifies file storage extension creates required state files in storage and compaction directories
 
-### 4. Log Generator Application
-The test includes a log generator application that writes logs to files which are then collected by the sidecar collector.
+### 4. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Create OTEL Collector** - Deploy main collector with debug exporter and configure namespace RBAC
-2. **Create Log Generator App** - Deploy application that generates plaintext logs
-3. **Wait for Log Collection** - Allow 10 seconds for logs to be processed
-4. **Check Collected Logs** - Verify logs are collected and forwarded to main collector
-5. **Confirm File Storage Extension** - Verify file storage extension creates required state files
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Create OTEL Collector** - Deploy from [`otel-filestorageext.yaml`](./otel-filestorageext.yaml)
+2. **Create Log Generator App** - Deploy from [`app-plaintest-logs.yaml`](./app-plaintest-logs.yaml)
+3. **Wait for Log Collection** - Allow processing time for logs to flow through the pipeline
+4. **Check Collected Logs** - Execute [`check_logs.sh`](./check_logs.sh) validation script
+5. **Confirm File Storage Extension** - Execute [`check_filestorageext.sh`](./check_filestorageext.sh) validation script
 
 ## 🔍 File Storage Extension Configuration
 
@@ -138,16 +78,19 @@ The test includes a log generator application that writes logs to files which ar
 
 ## 🔍 Verification
 
-The test verification includes two checks:
+The test verification includes two checks handled by separate scripts:
 
 ### 1. Log Processing Verification:
-Confirms that logs are successfully collected from files and forwarded to the main collector.
+[`check_logs.sh`](./check_logs.sh) confirms that:
+- Logs are successfully collected from files by the filelog receiver
+- Logs are properly parsed using regex operators
+- Logs are forwarded to the main collector via OTLP
 
 ### 2. File Storage Extension Verification:
-The `check_filestorageext.sh` script verifies that the file storage extension creates state files:
-- Checks for `receiver_filelog_` files in `/filestorageext/data`
-- Checks for `receiver_filelog_` files in `/filestorageext/compaction`
-- Confirms both storage and compaction directories contain the expected state files
+[`check_filestorageext.sh`](./check_filestorageext.sh) verifies that:
+- File storage extension creates `receiver_filelog_` state files in `/filestorageext/data`
+- Compaction directory `/filestorageext/compaction` contains the expected state files
+- Both storage and compaction directories function correctly for persistent state management
 
 ## 🧹 Cleanup
 

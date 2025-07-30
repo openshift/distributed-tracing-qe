@@ -12,96 +12,72 @@ The test validates that the Tail Sampling processor can:
 
 ## 📋 Test Resources
 
-### 1. Tempo Monolithic Instance
-```yaml
-apiVersion: tempo.grafana.com/v1alpha1
-kind: TempoMonolithic
-metadata:
-  name: tailsmp
-spec:
-  jaegerui:
-    enabled: true
-```
+The test uses the following key resources that are included in this directory:
 
-### 2. OpenTelemetry Collector with Tail Sampling Processor
-```yaml
-apiVersion: opentelemetry.io/v1beta1
-kind: OpenTelemetryCollector
-metadata:
-  name: tailsmp
-spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
-  config:
-    receivers:
-      otlp:
-        protocols:
-          grpc: {}
-          http: {}
+### 1. Tempo Instance
+- **File**: [`install-tempo.yaml`](./install-tempo.yaml)
+- **Contains**: TempoMonolithic deployment for trace storage
+- **Key Features**:
+  - Jaeger UI enabled for trace visualization and querying
+  - Receives sampled traces from OpenTelemetry collector
+  - Provides trace storage backend for verification
 
-    exporters:
-      debug:
-        verbosity: detailed
-      otlp:
-        endpoint: tempo-tailsmp:4317
-        tls:
-          insecure: true
+### 2. OpenTelemetry Collector with Tail Sampling
+- **File**: [`otel-collector.yaml`](./otel-collector.yaml)
+- **Contains**: OpenTelemetryCollector with tail sampling processor
+- **Key Features**:
+  - OTLP receiver for trace ingestion (gRPC and HTTP)
+  - Tail sampling processor with multiple policies
+  - OTLP exporter forwarding sampled traces to Tempo
+  - Debug exporter for trace verification
 
-    processors:
-      tail_sampling:
-        decision_wait: 30s
-        num_traces: 50000
-        expected_new_traces_per_sec: 20
-        policies:
-          [
-            {
-              name: status-code-policy,
-              type: status_code,
-              status_code: {status_codes: [ERROR]}
-            },
-            {
-              name: latency-policy,
-              type: latency,
-              latency: {threshold_ms: 5000, upper_threshold_ms: 10000}
-            },
-            {
-                name: span-count-policy,
-                type: span_count,
-                span_count: {min_spans: 39, max_spans: 50}
-            },
-            {
-                name: service-name-policy,
-                type: string_attribute,
-                string_attribute:
-                {
-                  key: service.name,
-                  values: [customer],
-                },
-            },
-          ]
-    service:
-      pipelines:
-        traces:
-          receivers: [otlp]
-          processors: [tail_sampling]
-          exporters: [otlp,debug]
-```
+### 3. HotROD Application
+- **File**: [`install-hotrod.yaml`](./install-hotrod.yaml)
+- **Contains**: Deployment for HotROD (Rides on Demand) demo application
+- **Key Features**:
+  - Generates realistic traces with various characteristics
+  - Provides complex trace patterns for testing sampling policies
+  - Creates traces with different latencies, span counts, and services
 
-### 3. HotROD Application Deployment
-The test deploys the HotROD (Rides on Demand) demo application which generates realistic traces with various characteristics for testing the sampling policies.
+### 4. HotROD Traffic Generation
+- **File**: [`hotrod-traces.yaml`](./hotrod-traces.yaml)
+- **Contains**: Job for generating HotROD application traffic
+- **Key Features**:
+  - Creates realistic user interactions with HotROD app
+  - Generates diverse trace patterns for sampling validation
+  - Triggers various service calls and operations
 
-### 4. Trace Generators
-- HotROD traffic generation to create traces with different patterns
-- Telemetrygen job to create additional test traces
+### 5. Additional Trace Generator
+- **File**: [`generate-traces.yaml`](./generate-traces.yaml)
+- **Contains**: Job for generating additional test traces
+- **Key Features**:
+  - Generates supplementary traces using telemetrygen
+  - Creates traces with specific attributes for policy testing
+  - Adds more trace volume for comprehensive testing
+
+### 6. Trace Verification
+- **File**: [`verify-traces.yaml`](./verify-traces.yaml)
+- **Contains**: Job for verifying sampled traces in Tempo
+- **Key Features**:
+  - Queries Tempo via Jaeger API for trace verification
+  - Validates that sampling policies work correctly
+  - Confirms expected traces are sampled and stored
+
+### 7. Chainsaw Test Definition
+- **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)
+- **Contains**: Complete test workflow orchestration
+- **Includes**: Test steps, assertions, and cleanup procedures
 
 ## 🚀 Test Steps
 
-1. **Create Tempo Instance** - Deploy Tempo monolithic instance for trace storage
-2. **Check Tempo Status** - Verify Tempo instance is ready
-3. **Create OTEL Collector** - Deploy collector with tail sampling processor
-4. **Install HotROD App** - Deploy the rides-on-demand demo application
-5. **Generate HotROD Traces** - Create traffic to generate realistic traces
-6. **Generate Additional Traces** - Send more traces using telemetrygen
-7. **Verify Traces** - Check that sampled traces are received in Tempo
+The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-test.yaml):
+
+1. **Create Tempo Instance** - Deploy from [`install-tempo.yaml`](./install-tempo.yaml)
+2. **Create OTEL Collector** - Deploy from [`otel-collector.yaml`](./otel-collector.yaml)
+3. **Install HotROD App** - Deploy from [`install-hotrod.yaml`](./install-hotrod.yaml)
+4. **Generate HotROD Traces** - Run from [`hotrod-traces.yaml`](./hotrod-traces.yaml)
+5. **Generate Additional Traces** - Run from [`generate-traces.yaml`](./generate-traces.yaml)
+6. **Verify Traces** - Execute from [`verify-traces.yaml`](./verify-traces.yaml)
 
 ## 🔍 Sampling Policies Applied
 
@@ -136,6 +112,15 @@ The test deploys the HotROD (Rides on Demand) demo application which generates r
 - **Expected New Traces Per Sec**: 20 - Expected trace rate for memory management
 - **Policy Evaluation**: OR logic - Trace is sampled if ANY policy matches
 
+## 🔍 Verification
+
+The verification is handled by [`verify-traces.yaml`](./verify-traces.yaml), which:
+- Queries Tempo for traces that match the sampling policies
+- Validates that error traces are consistently sampled
+- Confirms latency-based sampling works correctly
+- Ensures service-specific sampling is applied
+- Verifies span count filtering functions properly
+
 ## 🧹 Cleanup
 
 The test runs in the `chainsaw-tailsmp` namespace and all resources are cleaned up automatically when the test completes.
@@ -146,4 +131,5 @@ The test runs in the `chainsaw-tailsmp` namespace and all resources are cleaned 
 - Multiple policies with OR logic - any matching policy triggers sampling
 - Integrates with Tempo for trace storage and Jaeger UI for verification
 - Handles both generated telemetry and realistic application traces
-- Balances comprehensive error capture with selective sampling of normal traces 
+- Balances comprehensive error capture with selective sampling of normal traces
+- Decision wait time ensures complete traces are available for policy evaluation

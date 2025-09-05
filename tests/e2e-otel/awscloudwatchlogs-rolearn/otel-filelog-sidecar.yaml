@@ -4,7 +4,7 @@ metadata:
   name: otel-logs-sidecar-rolearn
 spec:
   mode: sidecar
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.129.1
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.132.0
   config:
     receivers:
       filelog:

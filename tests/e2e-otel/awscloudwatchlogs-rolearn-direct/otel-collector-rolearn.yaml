@@ -3,20 +3,20 @@ kind: OpenTelemetryCollector
 metadata:
   name: otelcol-cloudwatch
 spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.132.0
+  image: pavolloffay/otelcol-contrib:fix-aws-rolearn2
   serviceAccount: otelcol-cloudwatch
   env:
-    - name: AWS_REGION
+    - name: AWSREGION
       valueFrom:
         secretKeyRef:
           name: aws-sts-cloudwatch
           key: region
-    - name: LOG_GROUP_NAME
+    - name: LOGGROUPNAME
       valueFrom:
         secretKeyRef:
           name: aws-sts-cloudwatch
           key: log_group_name
-    - name: ROLE_ARN
+    - name: AWS_ROLE_ARN
       valueFrom:
         secretKeyRef:
           name: aws-sts-cloudwatch
@@ -35,17 +35,19 @@ spec:
         verbosity: detailed
       # AWS CloudWatch Logs exporter with STS configuration
       awscloudwatchlogs:
-        log_group_name: "${env:LOG_GROUP_NAME}"
+        log_group_name: "${env:LOGGROUPNAME}"
         log_stream_name: "tracing-otelcol-stream"
         raw_log: true
-        region: "${env:AWS_REGION}"
-        endpoint: "https://logs.us-east-2.amazonaws.com"
+        region: "${env:AWSREGION}"
         log_retention: 1
-        role_arn: "${env:ROLE_ARN}"
+        role_arn: "arn:aws:iam::123456789012:role/invalid-role-for-testing"
         tags: { 'tracing-otel': 'true', 'test-type': 'aws-sts-direct' }
 
     processors:
-      batch: {}
+      batch:
+        timeout: 10s
+        send_batch_size: 50
+        send_batch_max_size: 100
       # Add resource processor to include metadata
       resource:
         attributes:

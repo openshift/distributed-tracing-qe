@@ -37,3 +37,4 @@ spec:
         file: 04-verify-traces.yaml
     - assert:
         file: 04-assert.yaml
+

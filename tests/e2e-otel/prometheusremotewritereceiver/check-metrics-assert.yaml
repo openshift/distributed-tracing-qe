@@ -1,0 +1,8 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: check-remote-write-v2-metrics
+status:
+  conditions:
+  - type: Complete
+    status: "True"

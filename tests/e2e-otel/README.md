@@ -25,6 +25,7 @@ These test scenarios provide OpenTelemetry component configuration blueprints th
 | [k8sobjectsreceiver](./k8sobjectsreceiver/) | Kubernetes Object Monitoring | Custom resource monitoring, object state tracking |
 | [journaldreceiver](./journaldreceiver/) | systemd Journal Logs | System log collection, journal parsing, node-level logs |
 | [otlpjsonfilereceiver](./otlpjsonfilereceiver/) | OTLP JSON File Input | File-based OTLP data ingestion, batch processing |
+| [prometheusremotewritereceiver](./prometheusremotewritereceiver/) | Prometheus Remote Write v2 intake | Accepts RW v2 from OTel exporter; v2-only |
 
 ### 🔧 Processors
 | Component | Purpose | Key Features |
@@ -124,6 +125,18 @@ component-name/
    - Health checks and status monitoring
    - Performance metrics collection
    - Alerting and notification setup
+
+### Prometheus Remote Write v2 (Important)
+
+The Prometheus Remote Write receiver only accepts v2. To send v2 from the OpenTelemetry Collector `prometheusremotewrite` exporter, ensure:
+
+- Enable the feature gate on the sender collector:
+  - args.feature-gates: `exporter.prometheusremotewritexporter.enableSendingRW2`
+  - or via CLI flag: `--feature-gates=exporter.prometheusremotewritexporter.enableSendingRW2`
+- Use the v2 protobuf message on the exporter:
+  - `protobuf_message: "io.prometheus.write.v2.Request"`
+
+See `tests/e2e-otel/prometheusremotewritereceiver/otel-collector-sender.yaml` for a working example.
 
 ## 📊 Component Categories by Use Case
 

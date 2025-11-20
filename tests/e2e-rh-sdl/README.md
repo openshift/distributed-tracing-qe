@@ -8,19 +8,14 @@ The e2e-rh-sdl test suite implements security testing as part of the Red Hat Sec
 
 ## Test Components
 
-The test suite contains three main test scenarios:
+The test suite contains two main test scenarios:
 
-### 1. rapidast-jaeger/
-Security testing for Jaeger operator APIs
-- **Target**: Jaeger operator API endpoints (`jaegertracing.io/v1`)
-- **Scope**: Kubernetes API server endpoints for Jaeger resources
-
-### 2. rapidast-otel/
+### 1. rapidast-otel/
 Security testing for OpenTelemetry operator APIs
 - **Target**: OpenTelemetry operator API endpoints (`opentelemetry.io/v1alpha1`)
 - **Scope**: Kubernetes API server endpoints for OTel resources
 
-### 3. rapidast-tempo/
+### 2. rapidast-tempo/
 Security testing for Tempo operator APIs
 - **Target**: Tempo operator API endpoints (`tempo.grafana.com/v1alpha1`)
 - **Scope**: Kubernetes API server endpoints for Tempo resources
@@ -82,14 +77,11 @@ exclusions:
 ### Prerequisites
 - OpenShift/Kubernetes cluster with appropriate permissions
 - Chainsaw testing framework installed
-- Target operators (Jaeger, OpenTelemetry, or Tempo) deployed
+- Target operators (OpenTelemetry or Tempo) deployed
 
 ### Individual Test Execution
 
 ```bash
-# Run Jaeger operator security tests
-chainsaw test --config .chainsaw-rh-sdl.yaml --test-dir tests/e2e-rh-sdl/rapidast-jaeger/
-
 # Run OpenTelemetry operator security tests
 chainsaw test --config .chainsaw-rh-sdl.yaml --test-dir tests/e2e-rh-sdl/rapidast-otel/
 

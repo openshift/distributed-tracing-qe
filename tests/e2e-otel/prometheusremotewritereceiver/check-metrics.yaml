@@ -8,7 +8,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: check-metrics
-        image: bitnami/kubectl:latest
+        image: docker.io/bitnami/kubectl:latest
         command: ["/bin/bash"]
         args:
         - -c

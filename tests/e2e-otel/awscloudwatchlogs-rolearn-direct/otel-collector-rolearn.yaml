@@ -3,7 +3,7 @@ kind: OpenTelemetryCollector
 metadata:
   name: otelcol-cloudwatch
 spec:
-  image: pavolloffay/otelcol-contrib:fix-aws-rolearn2
+  image: docker.io/pavolloffay/otelcol-contrib:fix-aws-rolearn2
   serviceAccount: otelcol-cloudwatch
   env:
     - name: AWSREGION

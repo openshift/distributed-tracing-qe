@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: hotrod
-          image: jaegertracing/example-hotrod:1.46.0
+          image: docker.io/jaegertracing/example-hotrod:1.46.0
           args:
             - all
             - --otel-exporter=otlp

@@ -75,7 +75,7 @@ Disconnected/air-gapped environment tests.
 #### `tests/e2e-rh-sdl/`
 Red Hat Security Development Lifecycle tests.
 - Security-focused test scenarios using RapiDAST
-- Tests for Jaeger, OTel, and Tempo deployments
+- Tests for OTel and Tempo deployments
 
 #### `tests/perfscale-*/`
 Performance and scalability tests.

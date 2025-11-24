@@ -13,7 +13,7 @@ ENV GOPATH=/tmp/go \
     GOBIN=/tmp/go/bin \
     GOCACHE=/tmp/.cache/go-build \
     PATH=$PATH:/tmp/go/bin:/usr/local/go/bin \
-    CHAINSAW_VERSION=v0.2.12 \
+    CHAINSAW_VERSION=v0.2.13 \
     GO_VERSION=1.23.0
 
 # Install Go and create directories with proper permissions

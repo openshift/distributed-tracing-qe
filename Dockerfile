@@ -19,7 +19,7 @@ RUN mkdir -p /tmp/go/bin $GOCACHE \
 RUN apt-get update && apt-get install -y jq vim libreadline-dev unzip
 
 # Install chainsaw
-RUN curl -L -o chainsaw.tar.gz https://github.com/kyverno/chainsaw/releases/download/v0.2.12/chainsaw_linux_amd64.tar.gz \
+RUN curl -L -o chainsaw.tar.gz https://github.com/kyverno/chainsaw/releases/download/v0.2.13/chainsaw_linux_amd64.tar.gz \
     && tar -xvzf chainsaw.tar.gz \
     && chmod +x chainsaw \
     && mv chainsaw /usr/local/bin/

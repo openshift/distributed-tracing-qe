@@ -34,7 +34,7 @@ metadata:
   name: googlecloudexporter
   namespace: chainsaw-googlecloudexporter
 spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.132.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.140.1
   serviceAccount: chainsaw-googlecloudexporter-sa
   # Mount the Google WIF credential file and expose the credential path as env var
   env:

@@ -2,7 +2,9 @@
 set -euo pipefail
 
 # This script creates AWS STS configuration for CloudWatch Logs testing with direct role_arn
-# Modeled after tempo-operator STS configuration
+# This test uses TWO roles to properly test the exporter's role_arn parameter:
+#   1. Base role: Authenticated via web identity token
+#   2. Target role: Assumed by the exporter using role_arn parameter
 # Run the script with ./create-aws-rolearn-secret.sh COLLECTOR_NAME NAMESPACE
 
 # Check if OPENSHIFT_BUILD_NAMESPACE is unset or empty
@@ -34,15 +36,21 @@ log_group_name="tracing-$namespace-$OPENSHIFT_BUILD_NAMESPACE"
 echo "Creating CloudWatch log group: $log_group_name"
 aws logs create-log-group --log-group-name "$log_group_name" --region "$region" || echo "Log group may already exist"
 
-# Set required vars to create AWS IAM policy and role
+# Set required vars to create AWS IAM policies and roles
 oidc_provider=$(oc get authentication cluster -o json | jq -r '.spec.serviceAccountIssuer' | sed 's~http[s]*://~~g')
 aws_account_id=$(aws sts get-caller-identity --query 'Account' --output text)
 cluster_id=$(oc get clusterversion -o jsonpath='{.items[].spec.clusterID}{"\n"}')
-trust_rel_file="/tmp/$namespace-cloudwatch-trust.json"
-role_name="tracing-cloudwatch-$namespace-$OPENSHIFT_BUILD_NAMESPACE"
 
-# Create a trust relationship file for CloudWatch Logs
-cat > "$trust_rel_file" <<EOF
+# Role names (shortened to stay under AWS 64 char limit)
+base_role_name="cw-base-$namespace-$OPENSHIFT_BUILD_NAMESPACE"
+target_role_name="cw-target-$namespace-$OPENSHIFT_BUILD_NAMESPACE"
+
+# ======================
+# Create BASE ROLE (for web identity authentication)
+# ======================
+echo "Creating base IAM role '$base_role_name' for web identity authentication..."
+base_trust_file="/tmp/$namespace-cloudwatch-base-trust.json"
+cat > "$base_trust_file" <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -62,18 +70,79 @@ cat > "$trust_rel_file" <<EOF
 }
 EOF
 
-echo "Creating IAM role '$role_name'..."
-role_arn=$(aws iam create-role \
-             --role-name "$role_name" \
-             --assume-role-policy-document "file://$trust_rel_file" \
+base_role_arn=$(aws iam create-role \
+             --role-name "$base_role_name" \
+             --assume-role-policy-document "file://$base_trust_file" \
              --query Role.Arn \
              --output text)
 
-# Create custom CloudWatch Logs policy
-policy_name="CloudWatchLogsPolicy-$namespace-$OPENSHIFT_BUILD_NAMESPACE"
-policy_file="/tmp/$namespace-cloudwatch-policy.json"
+echo "Base role created: $base_role_arn"
 
-cat > "$policy_file" <<EOF
+# Attach minimal policy to base role (just STS permissions)
+base_policy_name="CWBasePolicy-$namespace-$OPENSHIFT_BUILD_NAMESPACE"
+base_policy_file="/tmp/$namespace-cloudwatch-base-policy.json"
+cat > "$base_policy_file" <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::${aws_account_id}:role/${target_role_name}"
+    }
+  ]
+}
+EOF
+
+echo "Creating base role policy '$base_policy_name'..."
+base_policy_arn=$(aws iam create-policy \
+             --policy-name "$base_policy_name" \
+             --policy-document "file://$base_policy_file" \
+             --query Policy.Arn \
+             --output text)
+
+echo "Attaching policy to base role..."
+aws iam attach-role-policy \
+  --role-name "$base_role_name" \
+  --policy-arn "$base_policy_arn"
+
+# Wait for IAM propagation before creating target role
+echo "Waiting for IAM propagation..."
+sleep 5
+
+# ======================
+# Create TARGET ROLE (to be assumed by exporter's role_arn)
+# ======================
+echo "Creating target IAM role '$target_role_name' for exporter to assume..."
+target_trust_file="/tmp/$namespace-cloudwatch-target-trust.json"
+cat > "$target_trust_file" <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::${aws_account_id}:role/${base_role_name}"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+
+target_role_arn=$(aws iam create-role \
+             --role-name "$target_role_name" \
+             --assume-role-policy-document "file://$target_trust_file" \
+             --query Role.Arn \
+             --output text)
+
+echo "Target role created: $target_role_arn"
+
+# Attach CloudWatch Logs policy to TARGET role
+target_policy_name="CWTargetPolicy-$namespace-$OPENSHIFT_BUILD_NAMESPACE"
+target_policy_file="/tmp/$namespace-cloudwatch-target-policy.json"
+
+cat > "$target_policy_file" <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -92,27 +161,29 @@ cat > "$policy_file" <<EOF
 }
 EOF
 
-echo "Creating IAM policy '$policy_name'..."
-policy_arn=$(aws iam create-policy \
-             --policy-name "$policy_name" \
-             --policy-document "file://$policy_file" \
+echo "Creating CloudWatch Logs policy '$target_policy_name'..."
+target_policy_arn=$(aws iam create-policy \
+             --policy-name "$target_policy_name" \
+             --policy-document "file://$target_policy_file" \
              --query Policy.Arn \
              --output text)
 
-echo "Attaching policy '$policy_name' to role '$role_name'..."
+echo "Attaching CloudWatch policy to target role..."
 aws iam attach-role-policy \
-  --role-name "$role_name" \
-  --policy-arn "$policy_arn"
+  --role-name "$target_role_name" \
+  --policy-arn "$target_policy_arn"
 
-echo "Role created and policy attached successfully!"
+echo "Roles created and policies attached successfully!"
 
 echo "Create the secret to be used with OpenTelemetry Collector"
 oc -n $namespace create secret generic aws-sts-cloudwatch \
   --from-literal=log_group_name="$log_group_name" \
   --from-literal=region="$region" \
-  --from-literal=role_arn="$role_arn"
+  --from-literal=base_role_arn="$base_role_arn" \
+  --from-literal=target_role_arn="$target_role_arn"
 
 echo "AWS STS configuration for CloudWatch Logs completed successfully!"
 echo "Log Group: $log_group_name"
-echo "Role ARN: $role_arn"
+echo "Base Role ARN (for web identity): $base_role_arn"
+echo "Target Role ARN (for exporter): $target_role_arn"
 echo "Region: $region"

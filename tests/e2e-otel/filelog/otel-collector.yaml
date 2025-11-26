@@ -33,7 +33,7 @@ metadata:
   name: clusterlogs
   namespace: chainsaw-filelog
 spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.132.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.140.1
   mode: daemonset
   config:
     receivers:

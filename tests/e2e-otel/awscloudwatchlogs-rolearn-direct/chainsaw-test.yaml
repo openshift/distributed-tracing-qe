@@ -17,20 +17,17 @@ spec:
     - script:
         timeout: 30s
         content: oc get secret aws-sts-cloudwatch -n chainsaw-awssts-cloudwatch-direct -o yaml
-  - name: Create service account with STS role annotation
+  - name: Create service account without STS role annotation
     try:
     - script:
         timeout: 30s
         content: |
-          ROLE_ARN=$(oc get secret aws-sts-cloudwatch -n chainsaw-awssts-cloudwatch-direct -o jsonpath='{.data.role_arn}' | base64 -d)
           cat <<EOF | oc apply -f -
           apiVersion: v1
           kind: ServiceAccount
           metadata:
             name: otelcol-cloudwatch
             namespace: chainsaw-awssts-cloudwatch-direct
-            annotations:
-              eks.amazonaws.com/role-arn: "$ROLE_ARN"
           EOF
   - name: Create sidecar OTEL collector for log collection
     try:
@@ -85,18 +82,18 @@ spec:
           sleep 30
           echo "Waiting for collector to attempt log delivery and encounter auth errors..."
           ./check_logs_rolearn.sh auth_errors
-  - name: Fix collector with correct role_arn
+  - name: Fix collector with correct target role_arn
     try:
     - script:
         timeout: 1m
         content: |
-          # Get the correct role_arn from the secret
-          CORRECT_ROLE_ARN=$(oc get secret aws-sts-cloudwatch -n chainsaw-awssts-cloudwatch-direct -o jsonpath='{.data.role_arn}' | base64 -d)
-          echo "Updating collector with correct role_arn: $CORRECT_ROLE_ARN"
-          
-          # Update the OpenTelemetryCollector resource with the correct role_arn
-          oc patch opentelemetrycollector otelcol-cloudwatch -n chainsaw-awssts-cloudwatch-direct --type='merge' -p='{"spec":{"config":{"exporters":{"awscloudwatchlogs":{"role_arn":"'$CORRECT_ROLE_ARN'"}}}}}'
-          
+          # Get the correct target_role_arn from the secret
+          CORRECT_TARGET_ROLE_ARN=$(oc get secret aws-sts-cloudwatch -n chainsaw-awssts-cloudwatch-direct -o jsonpath='{.data.target_role_arn}' | base64 -d)
+          echo "Updating collector with correct target role_arn: $CORRECT_TARGET_ROLE_ARN"
+
+          # Update the OpenTelemetryCollector resource with the correct target role_arn
+          oc patch opentelemetrycollector otelcol-cloudwatch -n chainsaw-awssts-cloudwatch-direct --type='merge' -p='{"spec":{"config":{"exporters":{"awscloudwatchlogs":{"role_arn":"'$CORRECT_TARGET_ROLE_ARN'"}}}}}'
+
           # Wait for the collector pod to restart
           sleep 20
           oc wait --for=condition=Ready pod -l app.kubernetes.io/name=otelcol-cloudwatch-collector -n chainsaw-awssts-cloudwatch-direct --timeout=120s

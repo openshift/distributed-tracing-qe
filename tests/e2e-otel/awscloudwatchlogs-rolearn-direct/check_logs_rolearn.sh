@@ -14,12 +14,14 @@ CHECK_AUTH_ERRORS="${1:-}"
 # Get STS configuration from the secret
 LOG_GROUP_NAME=$(oc get secret aws-sts-cloudwatch -n $NAMESPACE -o jsonpath='{.data.log_group_name}' | base64 -d)
 REGION=$(oc get secret aws-sts-cloudwatch -n $NAMESPACE -o jsonpath='{.data.region}' | base64 -d)
-ROLE_ARN=$(oc get secret aws-sts-cloudwatch -n $NAMESPACE -o jsonpath='{.data.role_arn}' | base64 -d)
+BASE_ROLE_ARN=$(oc get secret aws-sts-cloudwatch -n $NAMESPACE -o jsonpath='{.data.base_role_arn}' | base64 -d)
+TARGET_ROLE_ARN=$(oc get secret aws-sts-cloudwatch -n $NAMESPACE -o jsonpath='{.data.target_role_arn}' | base64 -d)
 
 echo "=== AWS CloudWatch Logs Direct Role ARN Test Verification ==="
 echo "Log Group: $LOG_GROUP_NAME"
 echo "Region: $REGION"
-echo "Role ARN: $ROLE_ARN"
+echo "Base Role ARN (web identity): $BASE_ROLE_ARN"
+echo "Target Role ARN (exporter): $TARGET_ROLE_ARN"
 echo ""
 
 # Function to check if required tools are available
@@ -217,14 +219,15 @@ demonstrate_sts_success() {
         echo "4. Next step: Fix the collector with correct role_arn"
     else
         echo "IMPORTANT FINDINGS:"
-        echo "1. Role ARN is configured directly in the awscloudwatchlogs exporter"
-        echo "2. AWS SDK handles web identity token exchange using service account"
-        echo "3. The collector uses the role_arn parameter for CloudWatch access"
-        echo "4. This test demonstrates direct role_arn configuration in OpenTelemetry"
+        echo "1. Two-role setup demonstrates proper role chaining"
+        echo "2. Base role authenticates via web identity token"
+        echo "3. Exporter assumes target role via role_arn parameter"
+        echo "4. This properly tests the exporter's role_arn functionality"
         echo ""
         echo "Direct Role ARN Configuration Summary:"
-        echo "- Service Account: otelcol-cloudwatch (no annotations needed)"
-        echo "- Role ARN in Exporter: $ROLE_ARN"
+        echo "- Service Account: otelcol-cloudwatch (no annotations)"
+        echo "- Base Role (web identity): $BASE_ROLE_ARN"
+        echo "- Target Role (exporter role_arn): $TARGET_ROLE_ARN"
         echo "- Token File: /var/run/secrets/eks.amazonaws.com/serviceaccount/token"
         echo "- Log Group: $LOG_GROUP_NAME"
     fi
@@ -250,12 +253,12 @@ main() {
         echo "Next: The test will fix the collector with the correct role_arn"
     else
         echo "This test successfully demonstrates:"
-        echo "✓ Direct role_arn configuration in exporter"
-        echo "✓ Collector startup with role ARN parameter"
-        echo "✓ CloudWatch Logs exporter using direct role_arn configuration"
+        echo "✓ Two-role setup with proper role chaining"
+        echo "✓ Base role authentication via web identity token"
+        echo "✓ Target role assumption via exporter's role_arn parameter"
+        echo "✓ CloudWatch Logs delivered successfully using assumed role"
         echo ""
-        echo "Direct role_arn configuration enables secure, temporary access to AWS services"
-        echo "by specifying the role directly in the exporter configuration."
+        echo "This validates the exporter's role_arn parameter for cross-account/role-chaining scenarios."
     fi
 }
 

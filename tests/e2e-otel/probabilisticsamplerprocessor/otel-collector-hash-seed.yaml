@@ -4,7 +4,7 @@ metadata:
   name: probabilistic-hash-seed
   namespace: chainsaw-probabilistic-sampler
 spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.132.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.140.1
   mode: deployment
   config:
     receivers:

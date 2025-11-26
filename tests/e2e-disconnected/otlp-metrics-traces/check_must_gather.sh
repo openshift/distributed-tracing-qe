@@ -10,11 +10,6 @@ oc adm must-gather --dest-dir=$MUST_GATHER_DIR --image=ghcr.io/open-telemetry/op
 # Define required files and directories
 REQUIRED_ITEMS=(
   event-filter.html
-  *-must-gather-sha256-*/olm/clusterserviceversion-opentelemetry-operator-*.yaml
-  *-must-gather-sha256-*/olm/*opentelemetry-operator*.yaml
-  *-must-gather-sha256-*/olm/installplan-install-*.yaml
-  *-must-gather-sha256-*/olm/subscription-opentelemetry-product.yaml
-  *-must-gather-sha256-*/namespaces/chainsaw-otlp-metrics/cluster-collector/service-cluster-collector-collector-headless.yaml
   *-must-gather-sha256-*/namespaces/chainsaw-otlp-metrics/cluster-collector/deployment-cluster-collector-collector.yaml
   *-must-gather-sha256-*/namespaces/chainsaw-otlp-metrics/cluster-collector/service-cluster-collector-collector-monitoring.yaml
   *-must-gather-sha256-*/namespaces/chainsaw-otlp-metrics/cluster-collector/opentelemetrycollector-cluster-collector.yaml

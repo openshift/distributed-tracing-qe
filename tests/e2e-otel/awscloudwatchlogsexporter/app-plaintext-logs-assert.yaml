@@ -24,6 +24,7 @@ status:
   - name: app-log-plaintext
     ready: true
     started: true
+  initContainerStatuses:
   - name: otc-container
     ready: true
     started: true

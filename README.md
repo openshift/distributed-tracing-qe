@@ -79,6 +79,9 @@ End-to-end tests for individual OpenTelemetry Collector components:
 - `oidcauthextension` - OIDC authentication
 - `filestorageext` - File-based storage
 
+**Signal Support (Tech Preview)**
+- `profilesignal` - Profiles signal support validation
+
 ### 🔌 Disconnected Environments (`tests/e2e-disconnected/`)
 
 Tests for air-gapped/disconnected environments:

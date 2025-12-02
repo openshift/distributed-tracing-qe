@@ -57,6 +57,11 @@ These test scenarios provide OpenTelemetry component configuration blueprints th
 | [oidcauthextension](./oidcauthextension/) | OIDC Authentication | Secure authentication, identity integration, access control |
 | [filestorageext](./filestorageext/) | File-based Storage | Persistent queuing, data buffering, reliability enhancement |
 
+### 🔬 Signal Support (Tech Preview)
+| Component | Purpose | Key Features |
+|-----------|---------|-------------|
+| [profilesignal](./profilesignal/) | Profiles Signal Support | Feature gate validation, pipeline configuration, collector readiness |
+
 ## 🚀 Quick Start
 
 ### Prerequisites

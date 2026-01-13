@@ -3,7 +3,7 @@ kind: OpenTelemetryCollector
 metadata:
   name: otelcol-cloudwatch
 spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.140.1
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.142.0
   serviceAccount: otelcol-cloudwatch
   volumes:
     - name: aws-iam-token

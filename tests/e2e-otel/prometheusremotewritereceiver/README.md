@@ -73,7 +73,7 @@ The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-t
 ### Sender Collector Prometheus Remote Write (v2) Configuration:
 - **Target Endpoint**: `http://otel-receiver-collector:9090/api/v1/write`
 - **Protocol**: Prometheus Remote Write v2 (enabled via feature gate + v2 protobuf)
-- **Collector Image**: `opentelemetry-collector-contrib:0.142.0`
+- **Collector Image**: `opentelemetry-collector-contrib:0.144.0`
 
 ### Simplified Architecture:
 ```

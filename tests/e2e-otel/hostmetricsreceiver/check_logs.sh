@@ -27,8 +27,11 @@ SEARCH_STRINGS=(
   "system.disk.operations"
   "system.disk.pending_operations"
   "system.disk.weighted_io_time"
-  "system.filesystem.inodes.usage"
-  "system.filesystem.usage"
+  # TODO: Uncomment when issue is fixed
+  # Filesystem scraper not working in hostmetrics receiver.
+  # See: https://issues.redhat.com/browse/TRACING-5963
+  # "system.filesystem.inodes.usage"
+  # "system.filesystem.usage"
   "system.memory.usage"
   "system.network.connections"
   "system.network.dropped"

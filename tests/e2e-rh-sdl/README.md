@@ -107,7 +107,13 @@ When running locally or outside the Tekton pipelines, you need to generate the `
      --dry-run=client -o yaml > tests/e2e-rh-sdl/rapidast-tempo/gcs-secret.yaml
    ```
 
-3. Run the chainsaw test:
+3. Set the `RHOSDT_VERSION` environment variable to tag the scan results in GCS with the product version (e.g., `3.5`, `3.6`):
+
+   ```bash
+   export RHOSDT_VERSION=3.5
+   ```
+
+4. Run the chainsaw test:
 
    ```bash
    # Run OpenTelemetry operator security tests
@@ -120,7 +126,8 @@ When running locally or outside the Tekton pipelines, you need to generate the `
 ### Complete SDL Test Suite
 
 ```bash
-# Generate both secret manifests first (see step 2 above), then run all tests
+# Generate both secret manifests first (see step 2 above), then set the RHOSDT_VERSION and run all tests
+export RHOSDT_VERSION=3.5
 chainsaw test --config .chainsaw-rh-sdl.yaml --test-dir tests/e2e-rh-sdl/
 ```
 
@@ -139,7 +146,7 @@ The tests use a dedicated Chainsaw configuration file (`.chainsaw-rh-sdl.yaml`) 
 4. **Configuration Generation**: Dynamically creates RapiDAST configuration with authentication tokens and GCS upload settings
 5. **Security Scan Execution**: Runs RapiDAST job with ZAP-based security scanning
 6. **Result Analysis**: Processes JSON and SARIF reports, evaluating risk levels
-7. **Result Upload**: Uploads scan results to the `secaut-bucket` GCS bucket under the `rhosdt` directory
+7. **Result Upload**: Uploads scan results to the `secaut-bucket` GCS bucket under the `rhosdt/{RHOSDT_VERSION}` directory
 8. **Validation**: Asserts successful completion and acceptable security posture
 
 ## Security Scan Results
@@ -201,8 +208,10 @@ config:
   googleCloudStorage:
     keyFile: "/etc/gcs/sa-key"
     bucketName: "secaut-bucket"
-    directory: "rhosdt"
+    directory: "rhosdt/${RHOSDT_VERSION}/otel"  # or "rhosdt/${RHOSDT_VERSION}/tempo"
 ```
+
+The `RHOSDT_VERSION` environment variable is used to tag results by product version (e.g., `3.5`, `3.6`). It is expanded at runtime by the `create-rapidast-configmap.sh` script.
 
 The GCS service account key is provided via the `rapidast-sa-rhosdt-key` Kubernetes secret (key: `sa-key`), mounted into the RapiDAST job container at `/etc/gcs/sa-key`. In the Tekton pipelines, this secret is sourced from the Konflux secret store. For local CLI runs, the secret manifest must be generated beforehand (see [Running outside of Tekton pipelines](#running-outside-of-tekton-pipelines-cli)).
 

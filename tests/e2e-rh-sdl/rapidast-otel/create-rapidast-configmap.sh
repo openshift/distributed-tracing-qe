@@ -16,7 +16,7 @@ data:
       googleCloudStorage:
         keyFile: "/etc/gcs/sa-key"
         bucketName: "secaut-bucket"
-        directory: "rhosdt/otel"
+        directory: "rhosdt/${RHOSDT_VERSION}/otel"
       results:
         exclusions:
           enabled: True

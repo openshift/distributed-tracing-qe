@@ -16,7 +16,7 @@ data:
       googleCloudStorage:
         keyFile: "/etc/gcs/sa-key"
         bucketName: "secaut-bucket"
-        directory: "rhosdt/tempo"
+        directory: "rhosdt/${RHOSDT_VERSION}/tempo"
       results:
         exclusions:
           enabled: True

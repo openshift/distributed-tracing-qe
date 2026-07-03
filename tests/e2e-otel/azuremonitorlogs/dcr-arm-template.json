@@ -34,7 +34,6 @@
       "apiVersion": "2024-03-11",
       "name": "[parameters('dataCollectionRuleName')]",
       "location": "[parameters('location')]",
-      "kind": "Direct",
       "dependsOn": [
         "[resourceId('Microsoft.Insights/dataCollectionEndpoints', parameters('dataCollectionEndpointName'))]"
       ],

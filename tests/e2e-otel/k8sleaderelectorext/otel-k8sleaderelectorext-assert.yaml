@@ -87,6 +87,28 @@ rules:
   - get
   - list
   - watch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chainsaw-k8sleaderelectorext-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chainsaw-k8sleaderelectorext-role
+subjects:
+- kind: ServiceAccount
+  name: chainsaw-k8sleaderelectorext
+  namespace: chainsaw-k8sleaderelectorext
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chainsaw-k8sleaderelectorext-lease-role
+  namespace: chainsaw-k8sleaderelectorext
+rules:
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -102,13 +124,14 @@ rules:
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
-  name: chainsaw-k8sleaderelectorext-binding
+  name: chainsaw-k8sleaderelectorext-lease-binding
+  namespace: chainsaw-k8sleaderelectorext
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: chainsaw-k8sleaderelectorext-role
+  kind: Role
+  name: chainsaw-k8sleaderelectorext-lease-role
 subjects:
 - kind: ServiceAccount
   name: chainsaw-k8sleaderelectorext

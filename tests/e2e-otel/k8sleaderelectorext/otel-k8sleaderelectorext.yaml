@@ -141,7 +141,7 @@ metadata:
 spec:
   mode: deployment
   replicas: 2
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.152.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.158.0
   serviceAccount: chainsaw-k8sleaderelectorext
   config: |
     extensions:

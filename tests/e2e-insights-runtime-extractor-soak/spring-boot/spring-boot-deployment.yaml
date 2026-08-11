@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: spring-boot
+  name: spring-boot-deployment
+  annotations: {}
+spec:
+  selector:
+    matchLabels:
+      app: spring-boot
+  replicas: 10
+  template:
+    metadata:
+      labels:
+        app: spring-boot
+    spec:
+      containers:
+        - name: container
+          image: 'quay.io/insights-runtime-extractor-samples/spring-boot:3.1.4'
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env: []
+      imagePullSecrets: []
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  paused: false

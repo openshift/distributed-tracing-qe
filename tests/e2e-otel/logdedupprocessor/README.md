@@ -23,7 +23,7 @@ The test validates that the log deduplication processor can:
 ### 2. Telemetry Data Generator
 - **File**: [`generate-logs.yaml`](./generate-logs.yaml)
 - **Contains**: Two telemetrygen jobs
-  - `logs-tenants` is one pod with two containers, `tenant-a` and `tenant-b`. Each sends the same log 5 times with its own `x-scope-orgid` header. The containers start together, so both tenants fall into the same `interval`; a processor that ignored `metadata_keys` would merge them into one record.
+  - `logs-tenants` is one pod with two containers, `tenant-a` and `tenant-b`. Each sends the same log 5 times with its own `x-scope-orgid` header. The containers start together, so both tenants normally fall into the same `interval`; a processor that ignored `metadata_keys` would then merge them into one record. There is no start barrier (the telemetrygen image has no shell), so a boundary between the two bursts is possible but rare; it can hide such a regression, but it cannot make a correct processor fail.
   - `logs-passthrough` sends 3 logs that do not match the processor condition
 - **Workload settings**: the jobs disable the service account token, run as non-root with all capabilities dropped, a read-only root filesystem and `backoffLimit: 0` (a retry would send the logs twice and change the counts)
 

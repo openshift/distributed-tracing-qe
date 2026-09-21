@@ -1,7 +1,10 @@
-# Both tenants send from the same pod. The two containers start together, so the logs of both
-# tenants reach the collector within the same 10s interval of the log_dedup processor. If the
-# processor ignored metadata_keys, the two tenants would then be merged into one record and
-# check_logs.sh would fail; separate pods could start in different intervals and hide that.
+# Both tenants send from the same pod. The two containers start together and telemetrygen sends
+# its logs in one burst, so both tenants normally reach the collector within the same 10s interval
+# of the log_dedup processor. If the processor ignored metadata_keys, the two tenants would then be
+# merged into one record and check_logs.sh would fail; separate pods could start in different
+# intervals and hide that. There is no start barrier (the telemetrygen image has no shell), so an
+# interval boundary between the two bursts is possible but rare. It can only hide a metadata_keys
+# regression; it can never make a correct processor fail.
 apiVersion: batch/v1
 kind: Job
 metadata:

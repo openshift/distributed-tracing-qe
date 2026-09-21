@@ -26,9 +26,13 @@ data:
         return server
 
 
-    def serve_tcp(port, tag):
-        server = listen_tcp(port)
+    def bind_udp(port):
+        server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        server.bind(("0.0.0.0", port))
+        return server
 
+
+    def serve_tcp(server, tag):
         def handle(conn):
             buf = b""
             while True:
@@ -46,11 +50,9 @@ data:
             threading.Thread(target=handle, args=(conn,), daemon=True).start()
 
 
-    def serve_tls_probe(port, tag):
+    def serve_tls_probe(server, tag):
         # Does not print the received bytes. It reports whether the client starts a TLS
         # handshake (record type 0x16) or sends plain text.
-        server = listen_tcp(port)
-
         def handle(conn):
             data = conn.recv(4096)
             if data:
@@ -62,22 +64,23 @@ data:
             threading.Thread(target=handle, args=(conn,), daemon=True).start()
 
 
-    def serve_udp(port, tag):
-        server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        server.bind(("0.0.0.0", port))
+    def serve_udp(server, tag):
         while True:
             data, _ = server.recvfrom(65535)
             emit(tag + " " + data.decode("utf-8", "replace").rstrip("\n"))
 
 
+    # Every socket is bound before the first handler thread starts. The readiness probe
+    # checks port 5140 only, so this is what makes a ready pod imply that all four ports
+    # accept traffic. A failed bind stops the process instead of leaving a half-working sink.
     listeners = [
-        (serve_tcp, 5140, "TCP-5424"),
-        (serve_udp, 5141, "UDP-3164"),
-        (serve_tcp, 5142, "TCP-OCTET"),
-        (serve_tls_probe, 5143, "TCP-TLSDEFAULT"),
+        (serve_tcp, listen_tcp(5140), "TCP-5424"),
+        (serve_udp, bind_udp(5141), "UDP-3164"),
+        (serve_tcp, listen_tcp(5142), "TCP-OCTET"),
+        (serve_tls_probe, listen_tcp(5143), "TCP-TLSDEFAULT"),
     ]
-    for target, port, tag in listeners:
-        threading.Thread(target=target, args=(port, tag), daemon=True).start()
+    for target, server, tag in listeners:
+        threading.Thread(target=target, args=(server, tag), daemon=True).start()
     emit("syslog sink ready")
     threading.Event().wait()
 
@@ -114,8 +117,9 @@ spec:
           protocol: TCP
         - containerPort: 5143
           protocol: TCP
-        # The listeners are started in threads after the process starts. The probes keep the
-        # pod out of the Service, and the chainsaw assert, until the plain TCP listener is bound.
+        # sink.py binds all four listeners before it starts serving, so a successful probe of the
+        # plain TCP listener also means the UDP and the other TCP listeners are bound. The probes
+        # keep the pod out of the Service, and the chainsaw assert, until then.
         readinessProbe:
           tcpSocket:
             port: 5140

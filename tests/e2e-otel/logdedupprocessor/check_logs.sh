@@ -3,7 +3,8 @@
 # deduplicated logs of the log_dedup processor.
 #
 # Two tenants (x-scope-orgid header, configured in metadata_keys) each send the same log 5 times,
-# from containers that start together so that both tenants fall into the same processor interval.
+# from containers that start together so that both tenants normally fall into the same processor
+# interval (see generate-logs.yaml for the rare case where they do not).
 # The processor has to keep the tenants apart, so the log_count values of the deduplicated
 # records add up to 10 and no single record counts more than 5. Logs that do not match the
 # processor condition must pass through unchanged, without a log_count attribute and without the

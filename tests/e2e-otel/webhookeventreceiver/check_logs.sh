@@ -9,7 +9,7 @@ EXPECTED=(
   '{"event":"one"}'
   '{"event":"two"}'
   '{"event":"three"}'
-  '{"source":"hmac-valid"}'
+  '{ "source": "hmac-valid" }'
   '{"source":"header-valid"}'
 )
 

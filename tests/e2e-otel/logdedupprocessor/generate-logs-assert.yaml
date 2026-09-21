@@ -1,15 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: logs-tenant-a
-status:
-  succeeded: 1
-
----
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: logs-tenant-b
+  name: logs-tenants
 status:
   succeeded: 1
 

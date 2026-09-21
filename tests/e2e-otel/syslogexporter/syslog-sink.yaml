@@ -96,6 +96,11 @@ spec:
       labels:
         app: syslog-sink
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: sink
         image: registry.access.redhat.com/ubi9/python-311:latest
@@ -109,6 +114,30 @@ spec:
           protocol: TCP
         - containerPort: 5143
           protocol: TCP
+        # The listeners are started in threads after the process starts. The probes keep the
+        # pod out of the Service, and the chainsaw assert, until the plain TCP listener is bound.
+        readinessProbe:
+          tcpSocket:
+            port: 5140
+          initialDelaySeconds: 1
+          periodSeconds: 2
+        livenessProbe:
+          tcpSocket:
+            port: 5140
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
         volumeMounts:
         - name: script
           mountPath: /scripts

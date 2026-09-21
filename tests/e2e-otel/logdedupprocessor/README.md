@@ -22,16 +22,17 @@ The test validates that the log deduplication processor can:
 
 ### 2. Telemetry Data Generator
 - **File**: [`generate-logs.yaml`](./generate-logs.yaml)
-- **Contains**: Three telemetrygen jobs
-  - `logs-tenant-a` and `logs-tenant-b` send the same log 5 times each with different `x-scope-orgid` headers
+- **Contains**: Two telemetrygen jobs
+  - `logs-tenants` is one pod with two containers, `tenant-a` and `tenant-b`. Each sends the same log 5 times with its own `x-scope-orgid` header. The containers start together, so both tenants fall into the same `interval`; a processor that ignored `metadata_keys` would merge them into one record.
   - `logs-passthrough` sends 3 logs that do not match the processor condition
+- **Workload settings**: the jobs disable the service account token, run as non-root with all capabilities dropped, a read-only root filesystem and `backoffLimit: 0` (a retry would send the logs twice and change the counts)
 
 ### 3. Verification Scripts
-- [`check_logs.sh`](./check_logs.sh) reads the debug exporter output and checks that
+- [`check_logs.sh`](./check_logs.sh) reads the debug exporter output record by record and checks that
   - the `log_count` values of the deduplicated logs add up to 10, no record counts more than 5 (the tenants were not merged) and there are at least 2 records
-  - the 3 passthrough logs appear individually and have no `log_count` attribute
-  - `first_observed_timestamp` and `last_observed_timestamp` are present
-- [`check_invalid_config.sh`](./check_invalid_config.sh) applies [`otel-collector-invalid.yaml`](./otel-collector-invalid.yaml) and checks that the collector reports `cannot define both exclude_fields and include_fields`
+  - every deduplicated record has `log_count`, `first_observed_timestamp` and `last_observed_timestamp`
+  - the 3 passthrough logs appear individually and have none of these three attributes
+- [`chainsaw-test.yaml`](./chainsaw-test.yaml) applies [`otel-collector-invalid.yaml`](./otel-collector-invalid.yaml), and [`check_invalid_config.sh`](./check_invalid_config.sh) checks that the collector reports `cannot define both exclude_fields and include_fields`
 
 ### 4. Chainsaw Test Definition
 - **File**: [`chainsaw-test.yaml`](./chainsaw-test.yaml)

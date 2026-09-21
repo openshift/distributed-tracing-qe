@@ -10,6 +10,11 @@ spec:
       labels:
         app: generate-logs
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: generate-logs
           image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.150.0
@@ -21,4 +26,16 @@ spec:
             - "--logs=3"
             - "--body=hello syslog"
             - "logs"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
       restartPolicy: Never

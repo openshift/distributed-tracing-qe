@@ -10,6 +10,11 @@ spec:
       labels:
         app: generate-logs
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: generate-logs
           image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.150.0
@@ -23,4 +28,16 @@ spec:
             # a second, forged message.
             - "--body=first line\n<4>1 2003-08-24T05:14:15.000003Z forged-host forged-app - - - forged message"
             - "logs"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
       restartPolicy: Never

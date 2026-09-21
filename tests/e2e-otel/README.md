@@ -26,6 +26,7 @@ These test scenarios provide OpenTelemetry component configuration blueprints th
 | [journaldreceiver](./journaldreceiver/) | systemd Journal Logs | System log collection, journal parsing, node-level logs |
 | [otlpjsonfilereceiver](./otlpjsonfilereceiver/) | OTLP JSON File Input | File-based OTLP data ingestion, batch processing |
 | [prometheusremotewritereceiver](./prometheusremotewritereceiver/) | Prometheus Remote Write v2 intake | Accepts RW v2 from OTel exporter; v2-only |
+| [webhookeventreceiver](./webhookeventreceiver/) | Webhook Events over HTTP | NDJSON splitting, HMAC signature and required header authentication, health check |
 
 ### 🔧 Processors
 | Component | Purpose | Key Features |
@@ -34,6 +35,7 @@ These test scenarios provide OpenTelemetry component configuration blueprints th
 | [filterprocessor](./filterprocessor/) | Data Filtering | Selective data processing, noise reduction, cost optimization |
 | [groupbyattrsprocessor](./groupbyattrsprocessor/) | Attribute Grouping | Data aggregation, resource optimization, cardinality reduction |
 | [tailsamplingprocessor](./tailsamplingprocessor/) | Intelligent Sampling | Trace-based sampling, performance optimization, cost control |
+| [logdedupprocessor](./logdedupprocessor/) | Log Deduplication | Identical logs aggregated with a count, per-tenant partitioning, conditions |
 
 ### 📤 Exporters
 | Component | Purpose | Key Features |
@@ -43,6 +45,7 @@ These test scenarios provide OpenTelemetry component configuration blueprints th
 | [awscloudwatchlogsexporter](./awscloudwatchlogsexporter/) | AWS CloudWatch Logs | Log aggregation, AWS cloud logging, centralized monitoring |
 | [loadbalancingexporter](./loadbalancingexporter/) | Load Balanced Export | High availability, traffic distribution, resilient telemetry |
 | [googlemanagedprometheus](./googlemanagedprometheus/) | Google Cloud Monitoring | GCP integration, managed Prometheus, cloud-native monitoring |
+| [syslogexporter](./syslogexporter/) | Syslog Export | RFC 5424/3164, TCP/UDP, TLS by default, octet counting |
 
 ### 🔗 Connectors
 | Component | Purpose | Key Features |

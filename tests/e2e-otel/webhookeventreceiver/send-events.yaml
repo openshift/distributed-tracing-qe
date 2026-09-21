@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webhook-client-script
+data:
+  client.py: |
+    import hashlib
+    import hmac
+    import sys
+    import urllib.error
+    import urllib.request
+
+    BASE = "webhookeventreceiver-collector"
+    failures = []
+
+
+    def call(method, port, path, body=None, headers=None):
+        request = urllib.request.Request(
+            "http://%s:%d%s" % (BASE, port, path),
+            data=body,
+            method=method,
+            headers=headers or {},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return response.status
+        except urllib.error.HTTPError as error:
+            return error.code
+
+
+    def expect(name, got, want):
+        print("RESULT %s: status=%s expected=%s" % (name, got, want), flush=True)
+        if got != want:
+            failures.append(name)
+
+
+    def sign(body):
+        return "sha256=" + hmac.new(b"e2e-secret", body, hashlib.sha256).hexdigest()
+
+
+    # Health check and NDJSON splitting (one log record per line).
+    expect("plain-health", call("GET", 8088, "/health_check"), 200)
+    ndjson = b'{"event":"one"}\n{"event":"two"}\n{"event":"three"}'
+    expect("plain-ndjson", call("POST", 8088, "/events", ndjson), 200)
+
+    # HMAC signature: valid and invalid.
+    valid = b'{"source":"hmac-valid"}'
+    expect("hmac-valid", call("POST", 8089, "/events", valid, {"X-Hub-Signature-256": sign(valid)}), 200)
+    invalid = b'{"source":"hmac-invalid"}'
+    expect("hmac-invalid", call("POST", 8089, "/events", invalid, {"X-Hub-Signature-256": sign(b"other body")}), 401)
+    unsigned = b'{"source":"hmac-unsigned"}'
+    expect("hmac-unsigned", call("POST", 8089, "/events", unsigned), 401)
+
+    # Required header: matching, wrong value and missing.
+    expect("header-valid", call("POST", 8090, "/events", b'{"source":"header-valid"}', {"X-E2E-Token": "e2e-token"}), 200)
+    expect("header-wrong", call("POST", 8090, "/events", b'{"source":"header-wrong"}', {"X-E2E-Token": "wrong"}), 401)
+    expect("header-missing", call("POST", 8090, "/events", b'{"source":"header-missing"}'), 401)
+
+    if failures:
+        print("FAILED: " + ", ".join(failures), flush=True)
+        sys.exit(1)
+    print("All webhook requests returned the expected status.", flush=True)
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: send-events
+spec:
+  completions: 1
+  parallelism: 1
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app: send-events
+    spec:
+      containers:
+        - name: send-events
+          image: registry.access.redhat.com/ubi9/python-311:latest
+          command: ["python3", "/scripts/client.py"]
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+      volumes:
+        - name: script
+          configMap:
+            name: webhook-client-script
+      restartPolicy: Never

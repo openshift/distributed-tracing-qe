@@ -1,0 +1,19 @@
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: webhookdefault
+spec:
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.158.0
+  config:
+    receivers:
+      # No endpoint: the operator adds the default 0.0.0.0:8088. The receiver itself requires one.
+      webhook_event: {}
+
+    exporters:
+      debug: {}
+
+    service:
+      pipelines:
+        logs:
+          receivers: [webhook_event]
+          exporters: [debug]

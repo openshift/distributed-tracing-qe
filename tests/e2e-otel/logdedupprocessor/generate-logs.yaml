@@ -1,0 +1,79 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: logs-tenant-a
+spec:
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: logs-tenant-a
+    spec:
+      containers:
+        - name: logs-tenant-a
+          image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.150.0
+          command: ["./telemetrygen"]
+          args:
+            - "--otlp-endpoint=logdedup-collector:4318"
+            - "--otlp-http"
+            - "--otlp-insecure=true"
+            - "--otlp-header=x-scope-orgid=\"tenant-a\""
+            - "--logs=5"
+            - "--body=duplicate message"
+            - "logs"
+      restartPolicy: Never
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: logs-tenant-b
+spec:
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: logs-tenant-b
+    spec:
+      containers:
+        - name: logs-tenant-b
+          image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.150.0
+          command: ["./telemetrygen"]
+          args:
+            - "--otlp-endpoint=logdedup-collector:4318"
+            - "--otlp-http"
+            - "--otlp-insecure=true"
+            - "--otlp-header=x-scope-orgid=\"tenant-b\""
+            - "--logs=5"
+            - "--body=duplicate message"
+            - "logs"
+      restartPolicy: Never
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: logs-passthrough
+spec:
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: logs-passthrough
+    spec:
+      containers:
+        - name: logs-passthrough
+          image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.150.0
+          command: ["./telemetrygen"]
+          args:
+            - "--otlp-endpoint=logdedup-collector:4318"
+            - "--otlp-http"
+            - "--otlp-insecure=true"
+            - "--otlp-header=x-scope-orgid=\"tenant-a\""
+            - "--logs=3"
+            - "--body=unique passthrough message"
+            - "logs"
+      restartPolicy: Never

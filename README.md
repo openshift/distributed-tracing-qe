@@ -55,6 +55,7 @@ End-to-end tests for individual OpenTelemetry Collector components:
 - `k8sobjectsreceiver` - Kubernetes object monitoring
 - `journaldreceiver` - systemd journal logs
 - `otlpjsonfilereceiver` - OTLP JSON file input
+- `webhookeventreceiver` - Webhook events over HTTP (HMAC and header authentication)
 
 **Processors**
 - `transformprocessor` - Data transformation
@@ -62,6 +63,7 @@ End-to-end tests for individual OpenTelemetry Collector components:
 - `groupbyattrsprocessor` - Attribute grouping
 - `tailsamplingprocessor` - Intelligent sampling
 - `probabilisticsamplerprocessor` - Probabilistic sampling
+- `logdedupprocessor` - Log deduplication
 
 **Exporters**
 - `prometheusremotewriteexporter` - Prometheus integration
@@ -69,6 +71,7 @@ End-to-end tests for individual OpenTelemetry Collector components:
 - `awscloudwatchlogsexporter` - AWS CloudWatch logs
 - `loadbalancingexporter` - Load balanced export
 - `googlemanagedprometheus` - Google Cloud monitoring
+- `syslogexporter` - Syslog export (RFC 5424/3164, TLS, octet counting)
 
 **Connectors**
 - `routingconnector` - Data routing

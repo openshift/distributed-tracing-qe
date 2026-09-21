@@ -1,0 +1,16 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: webhookeventreceiver-default-endpoint
+spec:
+  # Skipped until the operator used by the tests registers the webhook_event receiver parser
+  # (open-telemetry/opentelemetry-operator#5631). Without the parser a receiver without
+  # endpoint fails the collector config validation. Remove this line once it is released.
+  skip: true
+  steps:
+  - name: Create OTEL collector with a webhook event receiver without endpoint
+    try:
+    - apply:
+        file: otel-collector.yaml
+    - assert:
+        file: otel-collector-assert.yaml

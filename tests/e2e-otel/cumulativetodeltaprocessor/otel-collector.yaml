@@ -1,0 +1,28 @@
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: cumulativetodeltaprocessor
+spec:
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.158.0
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc: {}
+          http: {}
+
+    exporters:
+      debug:
+        verbosity: detailed
+
+    processors:
+      cumulative_to_delta:
+        include:
+          metric_types: [sum]
+
+    service:
+      pipelines:
+        metrics:
+          receivers: [otlp]
+          processors: [cumulative_to_delta]
+          exporters: [debug]

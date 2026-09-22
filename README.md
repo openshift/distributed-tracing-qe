@@ -64,6 +64,9 @@ End-to-end tests for individual OpenTelemetry Collector components:
 - `tailsamplingprocessor` - Intelligent sampling
 - `probabilisticsamplerprocessor` - Probabilistic sampling
 - `logdedupprocessor` - Log deduplication
+- `spanprocessor` - Span renaming and status override
+- `cumulativetodeltaprocessor` - Cumulative to delta metric conversion
+- `redactionprocessor` - Sensitive data redaction
 
 **Exporters**
 - `prometheusremotewriteexporter` - Prometheus integration
@@ -77,10 +80,16 @@ End-to-end tests for individual OpenTelemetry Collector components:
 - `routingconnector` - Data routing
 - `forwardconnector` - Data forwarding
 - `countconnector` - Metric generation
+- `spanmetricsconnector` - R.E.D metrics from spans
 
 **Extensions**
 - `oidcauthextension` - OIDC authentication
 - `filestorageext` - File-based storage
+- `zpagesextension` - Live debug pages
+- `pprofextension` - Go profiling
+- `jaegerremotesampling` - Remote sampling strategies
+- `headerssetterextension` - Header propagation
+- `memorylimiterextension` - Memory protection
 
 **Signal Support (Tech Preview)**
 - `profilesignal` - Profiles signal support validation

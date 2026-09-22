@@ -36,6 +36,9 @@ These test scenarios provide OpenTelemetry component configuration blueprints th
 | [groupbyattrsprocessor](./groupbyattrsprocessor/) | Attribute Grouping | Data aggregation, resource optimization, cardinality reduction |
 | [tailsamplingprocessor](./tailsamplingprocessor/) | Intelligent Sampling | Trace-based sampling, performance optimization, cost control |
 | [logdedupprocessor](./logdedupprocessor/) | Log Deduplication | Identical logs aggregated with a count, per-tenant partitioning, conditions |
+| [spanprocessor](./spanprocessor/) | Span Renaming & Status | Rename spans from attributes, override span status |
+| [cumulativetodeltaprocessor](./cumulativetodeltaprocessor/) | Temporality Conversion | Converts cumulative sum/histogram metrics to delta |
+| [redactionprocessor](./redactionprocessor/) | Sensitive Data Redaction | Allow-list attributes, mask blocked values, compliance |
 
 ### 📤 Exporters
 | Component | Purpose | Key Features |
@@ -53,12 +56,18 @@ These test scenarios provide OpenTelemetry component configuration blueprints th
 | [routingconnector](./routingconnector/) | Data Routing | Conditional routing, multi-destination, intelligent forwarding |
 | [forwardconnector](./forwardconnector/) | Data Forwarding | Pipeline chaining, data flow control, routing flexibility |
 | [countconnector](./countconnector/) | Metric Generation | Data counting, statistics generation, monitoring insights |
+| [spanmetricsconnector](./spanmetricsconnector/) | R.E.D Metrics from Spans | Derives call count and duration metrics from traces |
 
 ### 🔌 Extensions
 | Component | Purpose | Key Features |
 |-----------|---------|-------------|
 | [oidcauthextension](./oidcauthextension/) | OIDC Authentication | Secure authentication, identity integration, access control |
 | [filestorageext](./filestorageext/) | File-based Storage | Persistent queuing, data buffering, reliability enhancement |
+| [zpagesextension](./zpagesextension/) | Live Debug Pages | In-process `/debug/*` pages for service, pipeline and extension state |
+| [pprofextension](./pprofextension/) | Go Profiling | Exposes `net/http/pprof` endpoints for live profiling |
+| [jaegerremotesampling](./jaegerremotesampling/) | Remote Sampling Strategies | Serves Jaeger sampling strategies from a local file |
+| [headerssetterextension](./headerssetterextension/) | Header Propagation | Forwards a request header onto an outbound OTLP export |
+| [memorylimiterextension](./memorylimiterextension/) | Memory Protection | Rejects requests as receiver middleware when over a memory limit |
 
 ### 🔬 Signal Support (Tech Preview)
 | Component | Purpose | Key Features |

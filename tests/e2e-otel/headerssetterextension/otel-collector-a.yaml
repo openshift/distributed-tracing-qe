@@ -1,0 +1,36 @@
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: hse-a
+spec:
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.158.0
+  config:
+    extensions:
+      headers_setter:
+        headers:
+          - key: x-scope-orgid
+            action: upsert
+            # Forwards whatever x-scope-orgid value arrived on the inbound
+            # request context to the outbound OTLP export.
+            from_context: x-scope-orgid
+
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            include_metadata: true
+
+    exporters:
+      otlp:
+        endpoint: hse-b-collector:4317
+        tls:
+          insecure: true
+        auth:
+          authenticator: headers_setter
+
+    service:
+      extensions: [headers_setter]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          exporters: [otlp]

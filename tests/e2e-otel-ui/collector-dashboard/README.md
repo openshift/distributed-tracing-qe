@@ -96,8 +96,8 @@ artifacts.
 
 ## CI
 
-`openshift/release` runs this test in the `opentelemetry-upstream-ui-tests` job of the OpenTelemetry operator
-(upstream OCP 4.22 variant): the operator bundle built from the PR is installed, then the
+`openshift/release` runs this test in the `opentelemetry-ui-tests` job of the OpenTelemetry operator
+(variant `upstream-ui-ocp-4.22-amd64`): the operator bundle built from the PR is installed, then the
 `distributed-tracing-tests-opentelemetry-ui` step runs the test. The job is optional, and the step fails when a test
 fails. When it does, the `openshift-observability-qe-agent` post step triages the failure with the `otel-ui` skill.
 The step runs in the `playwright-base` image built from `../Dockerfile.playwright`
@@ -108,6 +108,10 @@ steps: ci-operator injects `KUBECONFIG` and `KUBEADMIN_PASSWORD_FILE` (`${SHARED
 Hive admin secret for claimed clusters) into every multi-stage step, and the step reads the console host from the
 `console` route. The login page selectors and timeouts are the ones of that Cypress login
 (`distributed-tracing-console-plugin/tests/cypress/support/commands.ts`).
+
+The same image is the agent image (`obs-tests-runner`) of the job, like `cypress-base` for the tracing UI plugin jobs
+(the job has its own variant configuration for that): the qe-agent post step runs in it, so it has the Claude Code CLI
+and `yq` besides the tools and the browser of the step, and the agent can rerun the specs.
 
 The version in `Dockerfile.playwright` (`PLAYWRIGHT_VERSION`) must equal `@playwright/test` in `ui/package.json`:
 Playwright only launches the browser revision it was released with. To publish a new image:

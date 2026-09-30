@@ -107,6 +107,10 @@ Hive admin secret for claimed clusters) into every multi-stage step, and the ste
 `console` route. The login page selectors and timeouts are the ones of that Cypress login
 (`distributed-tracing-console-plugin/tests/cypress/support/commands.ts`).
 
+The same image is the agent image (`obs-tests-runner`) of the job, like `cypress-base` for the tracing UI plugin jobs:
+the qe-agent post step runs in it, so it has the Claude Code CLI and `yq` besides the tools and the browser of the
+step, and the agent can rerun the specs.
+
 The version in `Dockerfile.playwright` (`PLAYWRIGHT_VERSION`) must equal `@playwright/test` in `ui/package.json`:
 Playwright only launches the browser revision it was released with. To publish a new image:
 

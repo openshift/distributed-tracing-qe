@@ -28,6 +28,9 @@ chainsaw test --test-dir tests/perfscale-ui-query/
 
 # Run security/SDL tests  
 chainsaw test --test-dir tests/e2e-rh-sdl/
+
+# Run the OpenShift console UI test (needs Node.js 20+ and a console login, see its README)
+chainsaw test --config .chainsaw.yaml --test-dir tests/e2e-otel-ui/collector-dashboard/
 ```
 
 ### Container Build
@@ -104,6 +107,11 @@ Tests for air-gapped/disconnected environments:
 - `otlp-metrics-traces` - OTLP metrics and traces
 - `smoke-targetallocator` - Target allocator smoke tests
 
+### 🖥️ OpenShift Console UI (`tests/e2e-otel-ui/`)
+
+Browser tests for the OpenShift web console, written with [Playwright](https://playwright.dev/) and launched from a Chainsaw test:
+- `collector-dashboard` - "OpenTelemetry Collector" dashboard under Observe > Dashboards (panels, data, variables)
+
 ### 🛡️ Security Testing (`tests/e2e-rh-sdl/`)
 
 Red Hat Security Development Lifecycle tests:
@@ -135,6 +143,7 @@ component-name/
 ### Key Technologies
 
 - **Chainsaw** - Test orchestration framework
+- **Playwright** - Browser UI tests for the OpenShift console (`tests/e2e-otel-ui/`)
 - **OpenTelemetry Operator** - Manages OTel Collector deployments
 - **Tempo** - Distributed tracing backend (Grafana)
 - **Jaeger** - Distributed tracing backend (legacy/compatibility)

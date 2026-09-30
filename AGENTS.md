@@ -43,7 +43,12 @@ chainsaw test --test-dir tests/perfscale-ui-query/
 
 # Run security/SDL tests  
 chainsaw test --test-dir tests/e2e-rh-sdl/
+
+# Run the OpenShift console UI test (Chainsaw prepares the data, then launches Playwright)
+chainsaw test --config .chainsaw.yaml --test-dir tests/e2e-otel-ui/collector-dashboard/
 ```
+
+The UI tests in `tests/e2e-otel-ui/` are the one exception to "plain Chainsaw assertions": a Chainsaw test creates the resources and telemetry, then runs Playwright as a `script` step. See `tests/e2e-otel-ui/collector-dashboard/README.md`.
 
 ### Container Build
 ```bash
@@ -77,6 +82,12 @@ Red Hat Security Development Lifecycle tests.
 - Security-focused test scenarios using RapiDAST
 - Tests for OTel and Tempo deployments
 
+#### `tests/e2e-otel-ui/`
+OpenShift web console UI tests (Playwright, launched from a Chainsaw test).
+- `collector-dashboard/` verifies the "OpenTelemetry Collector" dashboard under Observe > Dashboards
+- Chainsaw enables user workload monitoring, deploys collectors and telemetrygen, waits for the metrics, then runs Playwright
+- Needs the OpenTelemetry operator installed and a console login (kubeadmin)
+
 #### `tests/perfscale-*/`
 Performance and scalability tests.
 - Sizing recommendations and UI query performance tests
@@ -100,6 +111,7 @@ component-name/
 | Component | Purpose | Notes |
 |-----------|---------|-------|
 | **Chainsaw** | Test orchestration framework | All test execution |
+| **Playwright** | Browser UI testing | OpenShift console tests in `tests/e2e-otel-ui/`, run from a Chainsaw `script` step |
 | **OpenTelemetry Operator** | Manages OTel Collector deployments | Core infrastructure |
 | **Tempo** | Distributed tracing backend | Grafana stack |
 | **Jaeger** | Distributed tracing backend | Legacy/compatibility |

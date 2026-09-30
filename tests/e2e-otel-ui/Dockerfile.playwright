@@ -1,0 +1,44 @@
+# Runner image for the OpenShift console UI tests in tests/e2e-otel-ui.
+#
+# OpenShift CI step pods run as an arbitrary non-root user, so browsers and their system libraries have
+# to be baked into the image (`playwright install --with-deps` needs root). Playwright's own image
+# already ships Node.js, Chromium and the libraries; this adds what the Chainsaw test needs (chainsaw,
+# oc, jq, git). The test code is NOT baked in: the CI step clones distributed-tracing-qe at runtime.
+#
+# PLAYWRIGHT_VERSION must match "@playwright/test" in collector-dashboard/ui/package.json, because
+# Playwright only launches the browser revision it was released with.
+#
+# Build and publish (the image is mirrored into the CI registry from quay, see the README):
+#   podman build --platform linux/amd64 -f tests/e2e-otel-ui/Dockerfile.playwright \
+#     -t quay.io/redhat-distributed-tracing-qe/playwright-base:1.63.0 tests/e2e-otel-ui
+ARG PLAYWRIGHT_VERSION=1.63.0
+FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble
+
+ARG CHAINSAW_VERSION=v0.2.15
+# Set by podman/buildx from --platform. OpenShift CI runs amd64, arm64 lets Apple Silicon developers run natively.
+ARG TARGETARCH=amd64
+
+USER root
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl git jq tar \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install chainsaw (same release as Dockerfile-konflux), oc and kubectl
+RUN case "${TARGETARCH}" in \
+      amd64) OC_URL=https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest/openshift-client-linux.tar.gz ;; \
+      arm64) OC_URL=https://mirror.openshift.com/pub/openshift-v4/aarch64/clients/ocp/latest/openshift-client-linux-arm64-rhel9.tar.gz ;; \
+      *) echo "unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSL -o /tmp/chainsaw.tar.gz \
+      https://github.com/kyverno/chainsaw/releases/download/${CHAINSAW_VERSION}/chainsaw_linux_${TARGETARCH}.tar.gz \
+    && tar -xzf /tmp/chainsaw.tar.gz -C /usr/local/bin chainsaw \
+    && rm -f /tmp/chainsaw.tar.gz \
+    && curl -fsSL "${OC_URL}" | tar -xzC /usr/local/bin oc kubectl
+
+# The container runs as an arbitrary UID without a home directory: give it a writable one for the
+# npm cache and the kubeconfig cache.
+ENV HOME=/tmp/home
+RUN mkdir -p ${HOME} && chmod -R a+rwX ${HOME}
+
+WORKDIR /tmp

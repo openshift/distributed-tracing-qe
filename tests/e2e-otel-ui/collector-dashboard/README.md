@@ -96,16 +96,23 @@ artifacts.
 
 ## CI
 
-`openshift/release` runs this test in the `distributed-tracing-tests-opentelemetry-ui` step of the OpenTelemetry
-operator upstream jobs, before the operator's own chainsaw step. The step is non-blocking until
-`OTEL_UI_TESTS_BLOCKING=true`. It runs in the `playwright-base` image built from `../Dockerfile.playwright`
+`openshift/release` runs this test in the `opentelemetry-ui-tests` job of the OpenTelemetry operator
+(variant `upstream-ui-ocp-4.22-amd64`): the operator bundle built from the PR is installed, then the
+`distributed-tracing-tests-opentelemetry-ui-upstream` step runs the test. The step fails when a test fails, and so does
+the job. When it does, the `openshift-observability-qe-agent` post step triages the failure with the `otel-ui` skill
+and files a bug in the Jira project OOC for a product bug.
+The step runs in the `playwright-base` image built from `../Dockerfile.playwright`
 (`quay.io/redhat-distributed-tracing-qe/playwright-base`, mirrored to the CI registry as `ci/playwright-base`),
-takes the tests from this repository (`DT_QE_BRANCH`, default `main`) and logs in with the kubeadmin password of
+takes the tests from the `main` branch of this repository and logs in with the kubeadmin password of
 the CI cluster. The step needs no cluster variables of its own, it works like the tracing UI plugin (Cypress)
 steps: ci-operator injects `KUBECONFIG` and `KUBEADMIN_PASSWORD_FILE` (`${SHARED_DIR}/kubeadmin-password`, or the
 Hive admin secret for claimed clusters) into every multi-stage step, and the step reads the console host from the
 `console` route. The login page selectors and timeouts are the ones of that Cypress login
 (`distributed-tracing-console-plugin/tests/cypress/support/commands.ts`).
+
+The same image is the agent image (`obs-tests-runner`) of the job, like `cypress-base` for the tracing UI plugin jobs
+(the job has its own variant configuration for that): the qe-agent post step runs in it, so it has the Claude Code CLI
+and `yq` besides the tools and the browser of the step, and the agent can rerun the specs.
 
 The version in `Dockerfile.playwright` (`PLAYWRIGHT_VERSION`) must equal `@playwright/test` in `ui/package.json`:
 Playwright only launches the browser revision it was released with. To publish a new image:

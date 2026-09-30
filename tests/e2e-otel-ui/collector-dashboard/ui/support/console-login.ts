@@ -13,6 +13,28 @@ const LOGIN_TIMEOUT = 120_000;
  * HyperShift, the form is shown directly.
  */
 export async function loginAsKubeadmin(page: Page, baseUrl: string, password: string): Promise<void> {
+  try {
+    await login(page, baseUrl, password);
+  } catch (error) {
+    throw withoutSecret(error, password);
+  }
+}
+
+/**
+ * When `fill` fails (for example on a timeout) Playwright puts the value in the error message, in the call log
+ * (`fill("...")`). The message ends up in the build log and in the JUnit file, so it must not carry the password.
+ * A new error is thrown: its stack does not contain the value either.
+ */
+function withoutSecret(error: unknown, secret: string): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  if (!secret) {
+    return new Error(message);
+  }
+  const escaped = JSON.stringify(secret).slice(1, -1);
+  return new Error(message.split(secret).join('[REDACTED]').split(escaped).join('[REDACTED]'));
+}
+
+async function login(page: Page, baseUrl: string, password: string): Promise<void> {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
   const providerLink = page.getByRole('link', { name: 'kube:admin' });

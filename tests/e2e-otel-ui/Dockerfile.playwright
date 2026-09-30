@@ -30,7 +30,7 @@ ARG TARGETARCH=amd64
 USER root
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl git gnupg jq tar \
+    && apt-get install -y --no-install-recommends ca-certificates curl git jq tar \
     && rm -rf /var/lib/apt/lists/*
 
 # Install chainsaw (same release as Dockerfile-konflux), oc and kubectl
@@ -51,15 +51,21 @@ RUN curl -fsSL -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/do
 
 # Install the Claude Code CLI from its signed apt repository, as cypress-base does. `signed-by` trusts every key
 # in the file, so the primary keys in it must be exactly the expected one: the check fails when there is any other.
-RUN install -d -m 0755 /etc/apt/keyrings \
+# gnupg is only needed for that check: it is installed and purged in this same RUN, so that no layer of the image
+# has it. The package only depends on libc6 at run time.
+RUN export GNUPGHOME="$(mktemp -d)" \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends gnupg \
+    && install -d -m 0755 /etc/apt/keyrings \
     && curl -fsSL https://downloads.claude.ai/keys/claude-code.asc -o /etc/apt/keyrings/claude-code.asc \
-    && test "$(GNUPGHOME=$(mktemp -d) gpg --show-keys --with-colons /etc/apt/keyrings/claude-code.asc \
+    && test "$(gpg --show-keys --with-colons /etc/apt/keyrings/claude-code.asc \
          | awk -F: '$1 == "pub" { primary = 1; next } $1 == "fpr" && primary { print $10; primary = 0 }')" = "${CLAUDE_CODE_KEY_FPR}" \
     && echo "deb [signed-by=/etc/apt/keyrings/claude-code.asc] https://downloads.claude.ai/claude-code/apt/stable stable main" \
          > /etc/apt/sources.list.d/claude-code.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends claude-code=${CLAUDE_CODE_VERSION} \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get purge -y --auto-remove gnupg \
+    && rm -rf /var/lib/apt/lists/* "${GNUPGHOME}"
 
 # The container runs as an arbitrary UID without a home directory: give it a writable one for the
 # npm cache and the kubeconfig cache.

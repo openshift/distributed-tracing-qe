@@ -98,8 +98,9 @@ artifacts.
 
 `openshift/release` runs this test in the `opentelemetry-ui-tests` job of the OpenTelemetry operator
 (variant `upstream-ui-ocp-4.22-amd64`): the operator bundle built from the PR is installed, then the
-`distributed-tracing-tests-opentelemetry-ui-upstream` step runs the test. The job is optional, and the step fails when a test
-fails. When it does, the `openshift-observability-qe-agent` post step triages the failure with the `otel-ui` skill.
+`distributed-tracing-tests-opentelemetry-ui-upstream` step runs the test. The step fails when a test fails, and so does
+the job. When it does, the `openshift-observability-qe-agent` post step triages the failure with the `otel-ui` skill
+and files a bug in the Jira project OOC for a product bug.
 The step runs in the `playwright-base` image built from `../Dockerfile.playwright`
 (`quay.io/redhat-distributed-tracing-qe/playwright-base`, mirrored to the CI registry as `ci/playwright-base`),
 takes the tests from the `main` branch of this repository and logs in with the kubeadmin password of

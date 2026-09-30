@@ -96,9 +96,11 @@ artifacts.
 
 ## CI
 
-`openshift/release` runs this test in the `distributed-tracing-tests-opentelemetry-ui` step of the OpenTelemetry
-operator upstream jobs, before the operator's own chainsaw step. The step is non-blocking until
-`OTEL_UI_TESTS_BLOCKING=true`. It runs in the `playwright-base` image built from `../Dockerfile.playwright`
+`openshift/release` runs this test in the `opentelemetry-upstream-ui-tests` job of the OpenTelemetry operator
+(upstream OCP 4.22 variant): the operator bundle built from the PR is installed, then the
+`distributed-tracing-tests-opentelemetry-ui` step runs the test. The job is optional, and the step fails when a test
+fails. When it does, the `openshift-observability-qe-agent` post step triages the failure with the `otel-ui` skill.
+The step runs in the `playwright-base` image built from `../Dockerfile.playwright`
 (`quay.io/redhat-distributed-tracing-qe/playwright-base`, mirrored to the CI registry as `ci/playwright-base`),
 takes the tests from this repository (`DT_QE_BRANCH`, default `main`) and logs in with the kubeadmin password of
 the CI cluster. The step needs no cluster variables of its own, it works like the tracing UI plugin (Cypress)

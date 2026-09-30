@@ -42,3 +42,7 @@ ENV HOME=/tmp/home
 RUN mkdir -p ${HOME} && chmod -R a+rwX ${HOME}
 
 WORKDIR /tmp
+
+# Do not run as root by default: the `pwuser` account (UID 1001) of the Playwright image. Numeric, so that
+# `runAsNonRoot` can be verified. OpenShift CI overrides the UID anyway, HOME above works for any UID.
+USER 1001:1001

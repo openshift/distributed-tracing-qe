@@ -42,6 +42,10 @@ export KUBEADMIN_PASSWORD_FILE=/path/to/kubeadmin-password
 chainsaw test --config .chainsaw.yaml --test-dir tests/e2e-otel-ui/collector-dashboard
 ```
 
+Run `chainsaw` from the repository root, where `.chainsaw.yaml` is. The `script` steps of the test (`check_metrics.sh`,
+`npm ci` and `npx playwright test` in `ui/`) run in the test directory, `tests/e2e-otel-ui/collector-dashboard`,
+whatever the directory `chainsaw` was started from.
+
 Environment variables:
 
 | Variable | Purpose |

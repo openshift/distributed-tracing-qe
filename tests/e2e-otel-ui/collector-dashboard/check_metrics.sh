@@ -53,6 +53,9 @@ deadline=$((SECONDS + TIMEOUT))
 missing=()
 for query in "${queries[@]}"; do
   while true; do
+    # -k: the route is served with the cluster's self-signed ingress certificate (as the console is, see
+    # ignoreHTTPSErrors in ui/playwright.config.ts). The token is short-lived, only has cluster-monitoring-view
+    # and its service account is removed on exit.
     response=$(curl -sk --max-time 20 -H "Authorization: Bearer ${TOKEN}" \
       --data-urlencode "query=${query}" "https://${THANOS_QUERIER_HOST}/api/v1/query" || true)
     count=$(echo "$response" | jq -r '.data.result | length' 2>/dev/null || echo 0)

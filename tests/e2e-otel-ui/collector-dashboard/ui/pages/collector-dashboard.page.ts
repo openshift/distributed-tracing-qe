@@ -142,7 +142,7 @@ export class CollectorDashboardPage {
   /** Options of a variable dropdown (including "All"). */
   async variableOptions(name: VariableName): Promise<string[]> {
     const toggle = this.variable(name).getByRole('button');
-    await toggle.scrollIntoViewIfNeeded();
+    // click() scrolls into view and retries on DOM detachment, unlike scrollIntoViewIfNeeded().
     await toggle.click();
     const options = this.page.getByRole('option');
     await expect(options.first()).toBeVisible();
@@ -153,7 +153,7 @@ export class CollectorDashboardPage {
 
   async selectVariable(name: VariableName, option: string): Promise<void> {
     const toggle = this.variable(name).getByRole('button');
-    await toggle.scrollIntoViewIfNeeded();
+    // click() scrolls into view and retries on DOM detachment, unlike scrollIntoViewIfNeeded().
     await toggle.click();
     await this.page.getByRole('option', { name: option, exact: true }).click();
   }

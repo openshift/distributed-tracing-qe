@@ -24,9 +24,8 @@ All scenarios are optional (label `test.appstudio.openshift.io/optional: "true"`
 | `otel-e2e-tests-4-22-<ART version>` | e2e | `ocp_version=4.22`, `run_dast=true` |
 | `otel-upgrade-tests-4-22-<ART version>` | upgrade | `ocp_version=4.22` |
 
-ART starts the scenarios named in the `group.yml` of its `ocp-build-data` branch after each FBC build (one build per OCP
-version). The scenario needs `contexts: [{name: disabled}]` for that, so Konflux does not start it on its own. The first
-task of each pipeline reads the OCP version from the labels of the FBC image and compares it with `ocp_version`; when they differ,
+Every ART build of the FBC (one build per OCP version) makes a Konflux Snapshot with one component, and Konflux starts the
+scenarios on it (context `push`, like the other scenarios). The first task of each pipeline reads the OCP version from the labels of the FBC image and compares it with `ocp_version`; when they differ,
 all other tasks are skipped and the run succeeds. So every scenario sees the FBC of every OCP version and works on its own.
 
 ## How a run works
@@ -58,14 +57,14 @@ The tests are cloned from `openshift/open-telemetry-opentelemetry-operator`, bra
 Run `konflux/integration-tests/update-versions.sh <rhosdt-version> <art-version> [ocp-version]`, for example
 `update-versions.sh 3.11 0.158`. It sets the per-release defaults of the pipelines (operator, collector and target allocator
 versions, tests branch, product version, name of the upgrade CSV in the stable channel of the FBC). Review the diff, then update
-the ITS in `konflux-release-data` (application and names carry the ART version) and the `fbc` list in the `group.yml` of the new
-`ocp-build-data` branch. The skill `otel-qe-prepare-konflux-tests` describes the full procedure.
+the ITS in `konflux-release-data` (application and names carry the ART version). The skill `otel-qe-prepare-konflux-tests`
+describes the full procedure.
 
 ## Run by hand
 
 Maintainers of the tenant can manage ITS and patch Snapshots, but cannot create PipelineRuns:
 
-1. Create a test ITS (same as above, `contexts: [{name: disabled}]`, `revision` of the resolver set to your branch of this repo).
+1. Create a test ITS (same as above, `contexts: [{name: disabled}]` so Konflux does not start it on its own, `revision` of the resolver set to your branch of this repo).
 2. Label a Snapshot of the FBC application: `oc label snapshot <name> -n art-rhosdt-tenant test.appstudio.openshift.io/run=<its>`.
 3. Follow the PipelineRun in the Konflux UI (`https://konflux-ui.apps.kflux-ocp-p01.7ayg.p1.openshiftapps.com/ns/art-rhosdt-tenant`).
    Log in with `oc login --web https://api.kflux-ocp-p01.7ayg.p1.openshiftapps.com:6443/`.

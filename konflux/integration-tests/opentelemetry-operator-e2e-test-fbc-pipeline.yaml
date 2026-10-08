@@ -1,0 +1,964 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: opentelemetry-operator-e2e-tests-fbc
+spec:
+  description: |
+    End-to-end tests of the Red Hat build of OpenTelemetry for an ART FBC build. The pipeline runs when ART has
+    built the FBC fragment (ART builds it after the operator, collector and target allocator images are in the
+    stage registry). It does nothing when the fragment is for another OCP version than `ocp_version`, so one
+    IntegrationTestScenario per OCP version can run on every FBC build.
+
+    The pipeline creates an ephemeral OpenShift CI HyperShift cluster of `ocp_version`, adds the stage registry
+    credentials and a mirror from registry.redhat.io/rhosdt to registry.stage.redhat.io/rhosdt, installs the operator
+    from the FBC (CatalogSource and Subscription) and its dependencies, optionally runs the RapiDAST scan
+    (`run_dast`), and runs the chainsaw tests of the product branch. The cluster is removed with the owning
+    PipelineRun.
+  params:
+    - name: SNAPSHOT
+      description: 'The JSON string representing the snapshot of the application under test.'
+      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+      type: string
+    - name: test-name
+      description: 'The name of the test corresponding to a defined Konflux integration test.'
+      default: 'opentelemetry-operator-e2e-tests'
+    - name: namespace
+      description: 'Namespace of the OpenTelemetry operator (the e2e tests expect opentelemetry-operator-system)'
+      default: 'opentelemetry-operator-system'
+    - name: ocp_version
+      description: OpenShift minor version of the cluster. The pipeline runs only for the FBC of this OCP version.
+      default: "4.22"
+    - name: run_dast
+      description: 'Run the RapiDAST scan ("true" or "false")'
+      default: "false"
+    - name: operator_version
+      description: Version of OpenTelemetry Operator
+      default: "0.158.0"
+    - name: operator_otel_collector_version
+      description: Version of the OTEL collector in the operator
+      default: "0.158.0"
+    - name: operator_targetallocator_version
+      description: Version of OTEL TargetAllocator
+      default: "0.158.0"
+    - name: otel_collector_version
+      description: Version of OpenTelemetry collector
+      default: "0.158.0"
+    - name: otel_tests_branch
+      description: "The branch of openshift/open-telemetry-opentelemetry-operator from which to run the tests"
+      default: "rhosdt-3.11"
+    - name: skip_tests
+      description: "Tests to be skipped seperated with a space delimiter"
+      default: "tests/e2e/smoke-ip-families tests/e2e-otel/google* tests/e2e-otel/oidcauthextension tests/e2e-otel/*aws* tests/e2e-otel/azuremonitorlogs tests/e2e/smoke-ports tests/e2e-targetallocator/targetallocator-prometheuscr tests/e2e-instrumentation/instrumentation-go tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer-go tests/e2e/httpRoute"
+    - name: rhosdt_version
+      description: "RHOSDT product version used to tag RapiDAST scan results in GCS"
+      default: "3.11"
+    - name: stage_registry_secret
+      description: Secret of this namespace (type dockerconfigjson) with the credentials of registry.stage.redhat.io
+      default: "stage-registry-creds"
+    - name: rapidast_secret
+      description: Secret of this namespace with the GCS service account key (key sa-key) for the RapiDAST results
+      default: "rapidast-sa-rhosdt-key"
+    - name: compute_node_type
+      description: AWS instance type for ephemeral HyperShift worker nodes
+      default: "m5.2xlarge"
+    - name: hypershift_node_count
+      description: Number of worker nodes for the ephemeral HyperShift cluster
+      default: "3"
+    - name: hosted_management_cluster
+      description: Hosted management cluster used to provision the ephemeral cluster
+      default: "hosted-mgmt2"
+  tasks:
+    - name: parse-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/integration-examples
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/test_metadata.yaml
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+    - name: resolve-ocp-version
+      description: Finds the OCP version of the FBC fragment and compares it with ocp_version
+      runAfter:
+        - parse-metadata
+      params:
+        - name: FBC_FRAGMENT
+          value: $(tasks.parse-metadata.results.component-container-image)
+        - name: OCP_VERSION
+          value: $(params.ocp_version)
+      taskSpec:
+        params:
+          - name: FBC_FRAGMENT
+            type: string
+          - name: OCP_VERSION
+            type: string
+        results:
+          - name: ocp-version
+            description: OCP version of the FBC fragment
+          - name: matches
+            description: '"true" when the FBC fragment is for the OCP version of this scenario'
+        steps:
+          - name: resolve
+            image: quay.io/konflux-ci/konflux-test:v1.4.52@sha256:aa2c97da9bb73a4e8d1c6b41950f8d902b74461be0e042debe89277fdc4ebe49
+            env:
+              - name: FBC_FRAGMENT
+                value: $(params.FBC_FRAGMENT)
+              - name: OCP_VERSION
+                value: $(params.OCP_VERSION)
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+
+              # Only the config blob of the image is read (an FBC image is large). The label
+              # com.redhat.fbc.openshift.version (a JSON array, for example ["v4.14"]) wins when it is set,
+              # otherwise the version label of the operator-registry base image is used (for example v4.21.0).
+              raw=$(skopeo inspect --retry-times 3 --config --override-os linux --override-arch amd64 "docker://${FBC_FRAGMENT}" \
+                | jq -r '.config.Labels["com.redhat.fbc.openshift.version"] // .config.Labels.version // empty')
+              if [ -z "${raw}" ]; then
+                echo "ERROR: no OCP version label on ${FBC_FRAGMENT}"
+                exit 1
+              fi
+              versions=$(echo "${raw}" | tr -d '[]" ' | tr ',' '\n' | sed -E 's/^v//' | cut -d. -f1,2)
+              echo "FBC fragment ${FBC_FRAGMENT} is for OCP: $(echo "${versions}" | tr "\n" " ")"
+              echo "This scenario runs on OCP ${OCP_VERSION}"
+
+              want="${OCP_VERSION#v}"
+              if ! [[ "${want}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+                echo "ERROR: ocp_version must look like 4.22, got '${OCP_VERSION}'"
+                exit 1
+              fi
+
+              echo -n "$(echo "${versions}" | head -n1)" > "$(results.ocp-version.path)"
+              if echo "${versions}" | grep -qxF "${want}"; then
+                echo -n "true" > "$(results.matches.path)"
+              else
+                echo "Skipping: not the OCP version of this scenario."
+                echo -n "false" > "$(results.matches.path)"
+              fi
+    - name: prepare-cluster-env
+      runAfter:
+        - resolve-ocp-version
+      when:
+        - input: $(tasks.resolve-ocp-version.results.matches)
+          operator: in
+          values: ["true"]
+      params:
+        - name: compute_node_type
+          value: $(params.compute_node_type)
+        - name: hypershift_node_count
+          value: $(params.hypershift_node_count)
+        - name: hosted_management_cluster
+          value: $(params.hosted_management_cluster)
+      taskSpec:
+        params:
+          - name: compute_node_type
+            type: string
+          - name: hypershift_node_count
+            type: string
+          - name: hosted_management_cluster
+            type: string
+        results:
+          - name: env
+            description: OpenShift CI workflow environment as JSON
+        steps:
+          - name: prepare-env
+            image: quay.io/konflux-ci/konflux-test:v1.4.52@sha256:aa2c97da9bb73a4e8d1c6b41950f8d902b74461be0e042debe89277fdc4ebe49
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+
+              # The ART images are named registry.redhat.io/rhosdt/*@sha256:... and exist only on the stage
+              # registry until the release is published.
+              image_content_sources=$(cat <<'EOF'
+              - source: registry.redhat.io/rhosdt
+                mirrors:
+                  - registry.stage.redhat.io/rhosdt
+              EOF
+              )
+
+              jq -cn \
+                --arg computeNodeType "$(params.compute_node_type)" \
+                --arg nodeCount "$(params.hypershift_node_count)" \
+                --arg managementCluster "$(params.hosted_management_cluster)" \
+                --arg imageContentSources "$image_content_sources" \
+                '{
+                  COMPUTE_NODE_TYPE: $computeNodeType,
+                  HYPERSHIFT_NODE_COUNT: $nodeCount,
+                  HOSTED_MANAGEMENT_CLUSTER: $managementCluster,
+                  IMAGE_CONTENT_SOURCES: $imageContentSources
+                }' | tee "$(results.env.path)"
+    - name: provision-cluster
+      runAfter:
+        - prepare-cluster-env
+      when:
+        - input: $(tasks.resolve-ocp-version.results.matches)
+          operator: in
+          values: ["true"]
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/openshift/konflux-tasks
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/provision-ephemeral-cluster/0.1/provision-ephemeral-cluster.yaml
+      params:
+        - name: ownerName
+          value: $(context.pipelineRun.name)
+        - name: ownerUid
+          value: $(context.pipelineRun.uid)
+        - name: workflow
+          value: hypershift-hostedcluster-workflow
+        - name: clusterProfile
+          value: aws-konflux-prod
+        - name: timeout
+          value: 1h
+        - name: releases
+          value: >-
+            {"latest":{"release":{"channel":"stable","version":"$(params.ocp_version)","architecture":"multi"}}}
+        - name: env
+          value: $(tasks.prepare-cluster-env.results.env)
+    - name: add-stage-credentials
+      description: Adds the stage registry credentials to the pull secret of the cluster
+      runAfter:
+        - provision-cluster
+      when:
+        - input: $(tasks.resolve-ocp-version.results.matches)
+          operator: in
+          values: ["true"]
+      params:
+        - name: clusterCredentialsSecretRef
+          value: $(tasks.provision-cluster.results.secretRef)
+        - name: stageRegistrySecret
+          value: $(params.stage_registry_secret)
+      taskSpec:
+        params:
+          - name: clusterCredentialsSecretRef
+            type: string
+          - name: stageRegistrySecret
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.clusterCredentialsSecretRef)
+          - name: stage-registry
+            secret:
+              secretName: $(params.stageRegistrySecret)
+        steps:
+          - name: add-pull-secret
+            env:
+              - name: KUBECONFIG
+                value: /credentials/kubeconfig
+            volumeMounts:
+              - name: credentials
+                mountPath: /credentials
+              - name: stage-registry
+                mountPath: /stage
+                readOnly: true
+            image: quay.io/redhat-distributed-tracing-qe/konflux-e2e:latest
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+
+              echo "Adding the stage registry credentials to the pull secret of the cluster"
+
+              # Hosted clusters: HyperShift merges this secret into the global pull secret of the nodes
+              # (OCP versions with the global pull secret feature).
+              oc create secret generic additional-pull-secret -n kube-system \
+                --type=kubernetes.io/dockerconfigjson \
+                --from-file=.dockerconfigjson=/stage/.dockerconfigjson \
+                --dry-run=client -o yaml | oc apply -f -
+
+              # Other clusters: merge the credentials into the pull secret in openshift-config.
+              oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > /tmp/current.json
+              jq -s '.[0] * {auths: (.[0].auths + .[1].auths)}' /tmp/current.json /stage/.dockerconfigjson > /tmp/merged.json
+              oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged.json
+
+              # Wait until the nodes got it, when a syncer runs on the cluster.
+              if oc get daemonset global-pull-secret-syncer -n kube-system >/dev/null 2>&1; then
+                oc rollout status daemonset/global-pull-secret-syncer -n kube-system --timeout=10m
+              else
+                echo "No global-pull-secret-syncer daemonset on this cluster, waiting 2 minutes for the nodes"
+                sleep 120
+              fi
+    - name: install-operator-from-fbc
+      description: Installs the OpenTelemetry operator from the FBC fragment with a CatalogSource and a Subscription
+      runAfter:
+        - add-stage-credentials
+      when:
+        - input: $(tasks.resolve-ocp-version.results.matches)
+          operator: in
+          values: ["true"]
+      params:
+        - name: FBC_FRAGMENT
+          value: $(tasks.parse-metadata.results.component-container-image)
+        - name: namespace
+          value: $(params.namespace)
+        - name: clusterCredentialsSecretRef
+          value: $(tasks.provision-cluster.results.secretRef)
+      taskSpec:
+        params:
+          - name: FBC_FRAGMENT
+            type: string
+          - name: namespace
+            type: string
+          - name: clusterCredentialsSecretRef
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.clusterCredentialsSecretRef)
+        steps:
+          - name: install-operator
+            env:
+              - name: KUBECONFIG
+                value: /credentials/kubeconfig
+              - name: FBC_FRAGMENT
+                value: $(params.FBC_FRAGMENT)
+              - name: OTEL_NAMESPACE
+                value: $(params.namespace)
+            volumeMounts:
+              - name: credentials
+                mountPath: /credentials
+            image: quay.io/redhat-distributed-tracing-qe/konflux-e2e:latest
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+
+              echo "Installing the OpenTelemetry operator from ${FBC_FRAGMENT}"
+
+              oc create namespace "${OTEL_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+              oc label namespace "${OTEL_NAMESPACE}" openshift.io/cluster-monitoring=true --overwrite
+
+              cat <<EOF | oc apply -f -
+              apiVersion: operators.coreos.com/v1alpha1
+              kind: CatalogSource
+              metadata:
+                name: art-catalog-otel
+                namespace: openshift-marketplace
+              spec:
+                sourceType: grpc
+                image: ${FBC_FRAGMENT}
+                displayName: ART Catalog OTEL
+                publisher: ART
+              ---
+              apiVersion: operators.coreos.com/v1
+              kind: OperatorGroup
+              metadata:
+                name: ${OTEL_NAMESPACE}
+                namespace: ${OTEL_NAMESPACE}
+              spec:
+                upgradeStrategy: Default
+              ---
+              apiVersion: operators.coreos.com/v1alpha1
+              kind: Subscription
+              metadata:
+                name: opentelemetry-product
+                namespace: ${OTEL_NAMESPACE}
+              spec:
+                channel: stable
+                installPlanApproval: Automatic
+                name: opentelemetry-product
+                source: art-catalog-otel
+                sourceNamespace: openshift-marketplace
+              EOF
+
+              echo "Waiting for the catalog source"
+              for i in $(seq 1 40); do
+                state=$(oc get catalogsource art-catalog-otel -n openshift-marketplace -o jsonpath='{.status.connectionState.lastObservedState}')
+                [ "${state}" = "READY" ] && break
+                echo "Try ${i}/40: catalog source state is '${state}'"
+                sleep 15
+              done
+              [ "${state}" = "READY" ] || { echo "The catalog source did not become READY"; oc get pods -n openshift-marketplace; exit 1; }
+
+              echo "Waiting for the operator"
+              csv=""
+              for i in $(seq 1 60); do
+                csv=$(oc get subscription opentelemetry-product -n "${OTEL_NAMESPACE}" -o jsonpath='{.status.installedCSV}')
+                if [ -n "${csv}" ] && [ "$(oc get csv "${csv}" -n "${OTEL_NAMESPACE}" -o jsonpath='{.status.phase}')" = "Succeeded" ]; then
+                  echo "${csv} is installed"
+                  break
+                fi
+                echo "Try ${i}/60: the operator is not installed yet (csv: '${csv}')"
+                sleep 20
+              done
+              if [ -z "${csv}" ] || [ "$(oc get csv "${csv}" -n "${OTEL_NAMESPACE}" -o jsonpath='{.status.phase}')" != "Succeeded" ]; then
+                echo "The operator was not installed (csv: '${csv}')"
+                oc get subscription,installplan,csv -n "${OTEL_NAMESPACE}" || true
+                exit 1
+              fi
+              oc wait --for condition=Available -n "${OTEL_NAMESPACE}" deployment opentelemetry-operator-controller-manager --timeout=5m
+    - name: check-opentelemetry-version
+      description: The task checks OpenTelemetry operator and operand version details and image info
+      runAfter:
+        - install-operator-from-fbc
+      when:
+        - input: $(tasks.resolve-ocp-version.results.matches)
+          operator: in
+          values: ["true"]
+      params:
+        - name: namespace
+          value: $(params.namespace)
+        - name: OPERATOR_VERSION
+          value: $(params.operator_version)
+        - name: OPERATOR_OTEL_COLLECTOR_VERSION
+          value: $(params.operator_otel_collector_version)
+        - name: OPERATOR_TARGETALLOCATOR_VERSION
+          value: $(params.operator_targetallocator_version)
+        - name: OTEL_COLLECTOR_VERSION
+          value: $(params.otel_collector_version)
+        - name: clusterCredentialsSecretRef
+          value: $(tasks.provision-cluster.results.secretRef)
+        - name: stageRegistrySecret
+          value: $(params.stage_registry_secret)
+      taskSpec:
+        params:
+          - name: namespace
+            type: string
+          - name: OPERATOR_VERSION
+            type: string
+          - name: OPERATOR_OTEL_COLLECTOR_VERSION
+            type: string
+          - name: OPERATOR_TARGETALLOCATOR_VERSION
+            type: string
+          - name: OTEL_COLLECTOR_VERSION
+            type: string
+          - name: clusterCredentialsSecretRef
+            type: string
+          - name: stageRegistrySecret
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.clusterCredentialsSecretRef)
+          - name: stage-registry
+            secret:
+              secretName: $(params.stageRegistrySecret)
+        steps:
+          - name: check-version
+            env:
+              - name: KUBECONFIG
+                value: /credentials/kubeconfig
+              - name: OTEL_NAMESPACE
+                value: $(params.namespace)
+              - name: OPERATOR_VERSION
+                value: $(params.OPERATOR_VERSION)
+              - name: OPERATOR_OTEL_COLLECTOR_VERSION
+                value: $(params.OPERATOR_OTEL_COLLECTOR_VERSION)
+              - name: OPERATOR_TARGETALLOCATOR_VERSION
+                value: $(params.OPERATOR_TARGETALLOCATOR_VERSION)
+              - name: OTEL_COLLECTOR_VERSION
+                value: $(params.OTEL_COLLECTOR_VERSION)
+            volumeMounts:
+              - name: credentials
+                mountPath: /credentials
+              - name: stage-registry
+                mountPath: /stage
+                readOnly: true
+            image: quay.io/redhat-distributed-tracing-qe/konflux-e2e:latest
+            script: |
+              #!/bin/bash
+              set -eu
+
+              function log_cmd() {
+                  echo "\$ $*"
+                  "$@"
+              }
+              function exit_error() {
+                  >&2 echo -e "ERROR: $*"
+                  exit 1
+              }
+
+              function generate_random_name() {
+                  echo "random-name-$RANDOM"
+              }
+
+              function wait_for_pod_running() {
+                  local pod_name=$1
+                  local namespace=$2
+                  for _ in $(seq 1 150); do
+                      pod_status=$(oc get pod $pod_name -n $namespace -o jsonpath='{.status.phase}')
+                      if [ "$pod_status" == "Running" ] || [ "$pod_status" == "Succeeded" ]; then
+                          return 0
+                      elif [ "$pod_status" == "Failed" ] || [ "$pod_status" == "Unknown" ]; then
+                          exit_error "Pod $pod_name failed to start. Status: $pod_status"
+                      fi
+                      sleep 2
+                  done
+                  oc describe pod $pod_name -n $namespace
+                  exit_error "Pod $pod_name did not start. Status: $pod_status"
+              }
+
+              function check_strings_in_logs() {
+                  local pod_name=$1
+                  local namespace=$2
+                  shift 2
+                  local strings=("$@")
+
+                  logs=$(oc logs pod/$pod_name -n $namespace)
+                  for string in "${strings[@]}"; do
+                      if ! echo "$logs" | grep -q "$string"; then
+                          exit_error "String '$string' not found in logs of pod $pod_name"
+                      fi
+                  done
+              }
+
+              echo
+              echo "OPENTELEMETRY IMAGE DETAILS AND VERSION INFO"
+              echo
+
+              otel_images=$(oc get deployment opentelemetry-operator-controller-manager -n "${OTEL_NAMESPACE}" -o yaml | grep -oE 'registry\.redhat\.io/rhosdt/[^"[:space:]]+' | sort -u || true)
+              [ -n "$otel_images" ] || exit_error "No registry.redhat.io/rhosdt images in the operator deployment"
+              [ "$(echo "$otel_images" | wc -l)" -eq 3 ] || exit_error "Expected 3 images, found:\n$otel_images"
+
+              for image in $otel_images; do
+                  # The images are on the stage registry until the release is published.
+                  oc image info "${image/registry.redhat.io/registry.stage.redhat.io}" --registry-config /stage/.dockerconfigjson --filter-by-os linux/amd64
+                  echo
+
+                  random_name=$(generate_random_name)
+
+                  if [[ $image == *opentelemetry-rhel9-operator* ]]; then
+                      log_cmd oc run $random_name -n default --image=$image
+                      wait_for_pod_running $random_name default
+                      log_cmd oc logs pod/$random_name -n default | head -n 2
+                      check_strings_in_logs $random_name default "\"opentelemetry-operator\":\"${OPERATOR_VERSION}\"" "opentelemetry-collector:${OPERATOR_OTEL_COLLECTOR_VERSION}" "target-allocator:${OPERATOR_TARGETALLOCATOR_VERSION}"
+                  elif [[ $image == *opentelemetry-target-allocator-rhel9* ]]; then
+                      echo "SKIPPED: $image doesn't have a version command"
+                  else
+                      log_cmd oc run $random_name -n default --image=$image -- --version
+                      wait_for_pod_running $random_name default
+                      log_cmd oc logs pod/$random_name -n default
+                      check_strings_in_logs $random_name default "otelcol version ${OTEL_COLLECTOR_VERSION}"
+                  fi
+
+                  echo
+                  echo
+              done
+    - name: operators-install
+      description: Task to install the dependent operators from the Red Hat Operators catalog
+      runAfter:
+        - install-operator-from-fbc
+      when:
+        - input: $(tasks.resolve-ocp-version.results.matches)
+          operator: in
+          values: ["true"]
+      params:
+        - name: clusterCredentialsSecretRef
+          value: $(tasks.provision-cluster.results.secretRef)
+      taskSpec:
+        params:
+          - name: clusterCredentialsSecretRef
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.clusterCredentialsSecretRef)
+        steps:
+          - name: install-operators
+            env:
+              - name: KUBECONFIG
+                value: /credentials/kubeconfig
+            volumeMounts:
+              - name: credentials
+                mountPath: /credentials
+            image: quay.io/redhat-distributed-tracing-qe/konflux-e2e:latest
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+
+              # Loki and cluster-logging pin a channel that follows the OCP version: take the default channel of
+              # the catalog of the cluster.
+              pm_channel() {
+                oc get packagemanifest -n openshift-marketplace -o json | \
+                  jq -r --arg n "$1" '[.items[] | select(.metadata.name==$n and .status.catalogSource=="redhat-operators")][0].status.defaultChannel'
+              }
+              LOKI_CHANNEL=$(pm_channel loki-operator)
+              LOGGING_CHANNEL=$(pm_channel cluster-logging)
+              for c in "${LOKI_CHANNEL}" "${LOGGING_CHANNEL}"; do
+                if [ -z "$c" ] || [ "$c" = "null" ]; then
+                  echo "ERROR: could not resolve the channel of loki-operator ('${LOKI_CHANNEL}') or cluster-logging ('${LOGGING_CHANNEL}')"
+                  exit 1
+                fi
+              done
+
+              echo "Installing the dependent operators"
+              cat <<EOF | oc apply -f -
+              apiVersion: project.openshift.io/v1
+              kind: Project
+              metadata:
+                name: openshift-tempo-operator
+              ---
+              apiVersion: operators.coreos.com/v1
+              kind: OperatorGroup
+              metadata:
+                name: openshift-tempo-operator
+                namespace: openshift-tempo-operator
+              spec:
+                upgradeStrategy: Default
+              ---
+              apiVersion: operators.coreos.com/v1alpha1
+              kind: Subscription
+              metadata:
+                name: tempo-product
+                namespace: openshift-tempo-operator
+              spec:
+                channel: stable
+                installPlanApproval: Automatic
+                name: tempo-product
+                source: redhat-operators
+                sourceNamespace: openshift-marketplace
+              ---
+              apiVersion: operators.coreos.com/v1alpha1
+              kind: Subscription
+              metadata:
+                name: amq-streams
+                namespace: openshift-operators
+              spec:
+                channel: stable
+                installPlanApproval: Automatic
+                name: amq-streams
+                source: redhat-operators
+                sourceNamespace: openshift-marketplace
+              ---
+              apiVersion: project.openshift.io/v1
+              kind: Project
+              metadata:
+                name: openshift-cluster-observability-operator
+              ---
+              apiVersion: operators.coreos.com/v1
+              kind: OperatorGroup
+              metadata:
+                name: openshift-cluster-observability-operator
+                namespace: openshift-cluster-observability-operator
+              spec:
+                upgradeStrategy: Default
+              ---
+              apiVersion: operators.coreos.com/v1alpha1
+              kind: Subscription
+              metadata:
+                name: cluster-observability-operator
+                namespace: openshift-cluster-observability-operator
+              spec:
+                channel: stable
+                installPlanApproval: Automatic
+                name: cluster-observability-operator
+                source: redhat-operators
+                sourceNamespace: openshift-marketplace
+              ---
+              apiVersion: project.openshift.io/v1
+              kind: Project
+              metadata:
+                name: openshift-operators-redhat
+              ---
+              apiVersion: operators.coreos.com/v1
+              kind: OperatorGroup
+              metadata:
+                name: openshift-operators-redhat
+                namespace: openshift-operators-redhat
+              spec:
+                upgradeStrategy: Default
+              ---
+              apiVersion: operators.coreos.com/v1alpha1
+              kind: Subscription
+              metadata:
+                name: loki-operator
+                namespace: openshift-operators-redhat
+              spec:
+                channel: ${LOKI_CHANNEL}
+                installPlanApproval: Automatic
+                name: loki-operator
+                source: redhat-operators
+                sourceNamespace: openshift-marketplace
+              ---
+              apiVersion: project.openshift.io/v1
+              kind: Project
+              metadata:
+                name: openshift-logging
+              ---
+              apiVersion: operators.coreos.com/v1
+              kind: OperatorGroup
+              metadata:
+                name: openshift-logging
+                namespace: openshift-logging
+              spec:
+                upgradeStrategy: Default
+              ---
+              apiVersion: operators.coreos.com/v1alpha1
+              kind: Subscription
+              metadata:
+                name: cluster-logging
+                namespace: openshift-logging
+              spec:
+                channel: ${LOGGING_CHANNEL}
+                installPlanApproval: Automatic
+                name: cluster-logging
+                source: redhat-operators
+                sourceNamespace: openshift-marketplace
+              EOF
+
+              retry_count=30
+              sleep_duration=30
+
+              check_operator_installed() {
+                local operator=$1
+                local namespace=$2
+                local csv=""
+
+                for i in $(seq $retry_count); do
+                  if [[ -z "$csv" ]]; then
+                    csv=$(oc get subscription -n $namespace $operator -o jsonpath='{.status.installedCSV}')
+                  fi
+
+                  if [[ -z "$csv" ]]; then
+                    echo "Try ${i}/${retry_count}: can't get the $operator yet. Checking again in $sleep_duration seconds"
+                    sleep $sleep_duration
+                  else
+                    if [[ $(oc get csv -n $namespace $csv -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
+                      echo "$operator is successfully installed in namespace $namespace"
+                      return 0
+                    else
+                      echo "Try ${i}/${retry_count}: $operator is not deployed yet. Checking again in $sleep_duration seconds"
+                      sleep $sleep_duration
+                    fi
+                  fi
+                done
+
+                echo "$operator installation failed after $retry_count retries in namespace $namespace."
+                return 1
+              }
+
+              echo "Checking installation status of operators..."
+              check_operator_installed "tempo-product" openshift-tempo-operator
+              check_operator_installed "amq-streams" openshift-operators
+              check_operator_installed "cluster-observability-operator" openshift-cluster-observability-operator
+              check_operator_installed "loki-operator" openshift-operators-redhat
+              check_operator_installed "cluster-logging" openshift-logging
+              echo "Operator installation check completed."
+    - name: opentelemetry-e2e-tests
+      description: Task to run the tests of the product branch
+      runAfter:
+        - check-opentelemetry-version
+        - operators-install
+      when:
+        - input: $(tasks.resolve-ocp-version.results.matches)
+          operator: in
+          values: ["true"]
+      params:
+        - name: OTEL_TESTS_BRANCH
+          value: $(params.otel_tests_branch)
+        - name: SKIP_TESTS
+          value: $(params.skip_tests)
+        - name: OTEL_NAMESPACE
+          value: $(params.namespace)
+        - name: clusterCredentialsSecretRef
+          value: $(tasks.provision-cluster.results.secretRef)
+      taskSpec:
+        params:
+          - name: OTEL_TESTS_BRANCH
+            type: string
+          - name: SKIP_TESTS
+            type: string
+          - name: OTEL_NAMESPACE
+            type: string
+          - name: clusterCredentialsSecretRef
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.clusterCredentialsSecretRef)
+        steps:
+          - name: run-e2e-tests
+            volumeMounts:
+              - name: credentials
+                mountPath: /credentials
+            env:
+              - name: KUBECONFIG
+                value: /credentials/kubeconfig
+              - name: OTEL_TESTS_BRANCH
+                value: $(params.OTEL_TESTS_BRANCH)
+              - name: SKIP_TESTS
+                value: $(params.SKIP_TESTS)
+              - name: OTEL_NAMESPACE
+                value: $(params.OTEL_NAMESPACE)
+            image: quay.io/redhat-distributed-tracing-qe/konflux-e2e:latest
+            script: |
+              #!/bin/bash
+              set -uo pipefail
+
+              echo "Run e2e tests"
+              git clone https://github.com/openshift/open-telemetry-opentelemetry-operator.git /tmp/otel-tests
+              cd /tmp/otel-tests
+              git checkout "${OTEL_TESTS_BRANCH}"
+
+              #Enable user workload monitoring
+              oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
+              unset NAMESPACE
+
+              # Install the Prometheus ScrapeConfig CRD from a pinned release, unless the cluster already has it
+              if oc get crd scrapeconfigs.monitoring.coreos.com >/dev/null 2>&1; then
+                echo "The ScrapeConfig CRD exists, not changing it"
+              else
+                oc create -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.94.1/example/prometheus-operator-crd/monitoring.coreos.com_scrapeconfigs.yaml || { echo "Could not install the ScrapeConfig CRD"; exit 1; }
+              fi
+
+              # Remove test cases to be skipped from the test run
+              IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$SKIP_TESTS"
+              SKIP_TESTS_TO_REMOVE=""
+              INVALID_TESTS=""
+              for test in "${SKIP_TEST_ARRAY[@]}"; do
+                if [[ "$test" == tests/* ]]; then
+                  SKIP_TESTS_TO_REMOVE+=" $test"
+                else
+                  INVALID_TESTS+=" $test"
+                fi
+              done
+
+              if [[ -n "$INVALID_TESTS" ]]; then
+                echo "These test cases are not valid to be skipped: $INVALID_TESTS"
+              fi
+
+              if [[ -n "$SKIP_TESTS_TO_REMOVE" ]]; then
+                rm -rf $SKIP_TESTS_TO_REMOVE
+              fi
+
+              # Initialize a variable to keep track of errors
+              any_errors=false
+
+              # Determine OpenShift version and set sidecar selector
+              oc_version_minor=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null | cut -d . -f 2 || true)
+              selector="sidecar=legacy"
+              if [[ -n "$oc_version_minor" ]] && [[ "$oc_version_minor" -ge 16 ]]; then
+                selector="sidecar=native"
+              fi
+
+              # Execute OpenTelemetry e2e tests
+              chainsaw test \
+              --quiet \
+              --test-dir \
+              tests/e2e \
+              tests/e2e-autoscale \
+              tests/e2e-crd-validations \
+              tests/e2e-openshift \
+              tests/e2e-instrumentation \
+              tests/e2e-pdb \
+              tests/e2e-otel \
+              tests/e2e-multi-instrumentation \
+              tests/e2e-targetallocator-cr \
+              tests/e2e-targetallocator || any_errors=true
+
+              # Execute sidecar-related tests with version-dependent selector
+              chainsaw test \
+              --quiet \
+              --selector "$selector" \
+              --test-dir \
+              tests/e2e-prometheuscr \
+              tests/e2e-sidecar || any_errors=true
+
+              # Set the operator environment variables for metadata filters tests.
+              OTEL_CSV_NAME=$(oc get subscription opentelemetry-product -n "${OTEL_NAMESPACE}" -o jsonpath='{.status.installedCSV}')
+              if [ -z "${OTEL_CSV_NAME}" ]; then
+                echo "Could not read the installed CSV from the subscription, exiting with error."
+                exit 1
+              fi
+              oc -n "${OTEL_NAMESPACE}" patch csv "${OTEL_CSV_NAME}" --type=json -p '[
+                {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"ANNOTATIONS_FILTER","value":".*filter.out,config.*.gke.io.*"}},
+                {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"LABELS_FILTER","value":".*filter.out"}}
+              ]'
+              sleep 60
+              if oc -n "${OTEL_NAMESPACE}" get deployment opentelemetry-operator-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' | grep -q "True"; then
+                  echo "Operator deployment updated successfully for metadata filters, continuing script execution..."
+              else
+                  echo "Operator deployment update for metadata filters failed, exiting with error."
+                  exit 1
+              fi
+
+              # Execute OpenTelemetry e2e tests
+              chainsaw test \
+              --quiet \
+              --test-dir \
+              tests/e2e-metadata-filters || any_errors=true
+
+              # Check if any errors occurred
+              if $any_errors; then
+                echo "Tests failed, check the logs for more details."
+                exit 1
+              else
+                echo "All the tests passed."
+              fi
+    - name: dast-test
+      description: Task to run Dynamic Application Security Testing (DAST) using RapiDAST
+      runAfter:
+        - opentelemetry-e2e-tests
+      when:
+        - input: $(tasks.resolve-ocp-version.results.matches)
+          operator: in
+          values: ["true"]
+        - input: $(params.run_dast)
+          operator: in
+          values: ["true"]
+      params:
+        - name: clusterCredentialsSecretRef
+          value: $(tasks.provision-cluster.results.secretRef)
+        - name: rapidastSecret
+          value: $(params.rapidast_secret)
+        - name: rhosdtVersion
+          value: $(params.rhosdt_version)
+      taskSpec:
+        params:
+          - name: clusterCredentialsSecretRef
+            type: string
+          - name: rapidastSecret
+            type: string
+          - name: rhosdtVersion
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.clusterCredentialsSecretRef)
+          - name: gcs-key
+            secret:
+              secretName: $(params.rapidastSecret)
+        steps:
+          - name: rapidast-scan
+            volumeMounts:
+              - name: credentials
+                mountPath: /credentials
+              - name: gcs-key
+                mountPath: /etc/gcs
+                readOnly: true
+            env:
+              - name: KUBECONFIG
+                value: /credentials/kubeconfig
+              - name: RHOSDT_VERSION
+                value: $(params.rhosdtVersion)
+            image: quay.io/redhat-distributed-tracing-qe/konflux-e2e:latest
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+
+              echo "Clone distributed-tracing-qe repository"
+              git clone https://github.com/openshift/distributed-tracing-qe.git /tmp/distributed-tracing-tests
+              cd /tmp/distributed-tracing-tests
+
+              # Generate GCS secret manifest for chainsaw to apply on the ephemeral cluster
+              kubectl create secret generic rapidast-sa-rhosdt-key \
+                --from-file=sa-key=/etc/gcs/sa-key \
+                --namespace=rapidast-otel \
+                --dry-run=client -o yaml > tests/e2e-rh-sdl/rapidast-otel/gcs-secret.yaml
+
+              # Unset environment variable which conflicts with Chainsaw
+              unset NAMESPACE
+
+              # Execute DAST test using RapiDAST
+              chainsaw test \
+              --config .chainsaw-rh-sdl.yaml \
+              --test-dir \
+              tests/e2e-rh-sdl/rapidast-otel

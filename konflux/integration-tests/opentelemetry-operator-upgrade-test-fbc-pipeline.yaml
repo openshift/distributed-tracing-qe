@@ -1,0 +1,355 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: opentelemetry-operator-upgrade-test-fbc
+spec:
+  description: |
+    Upgrade test of the Red Hat build of OpenTelemetry for an ART FBC build. The pipeline runs when ART has built
+    the FBC fragment, and does nothing when the fragment is for another OCP version than `ocp_version`.
+
+    The pipeline creates an ephemeral OpenShift CI HyperShift cluster of `ocp_version`, adds the stage registry
+    credentials and a mirror from registry.redhat.io/rhosdt to registry.stage.redhat.io/rhosdt, and runs the
+    upgrade test (tests/e2e-openshift-upgrade) of the product branch: it installs the released operator from
+    redhat-operators, creates a catalog source from the FBC fragment and upgrades the operator to the version in it.
+    The cluster is removed with the owning PipelineRun.
+  params:
+    - name: SNAPSHOT
+      description: 'The JSON string representing the snapshot of the application under test.'
+      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+      type: string
+    - name: test-name
+      description: 'The name of the test corresponding to a defined Konflux integration test.'
+      default: 'opentelemetry-operator-upgrade-test-fbc'
+      type: string
+    - name: namespace
+      description: 'Namespace to run tests in'
+      default: 'opentelemetry-operator-system'
+      type: string
+    - name: ocp_version
+      description: OpenShift minor version of the cluster. The pipeline runs only for the FBC of this OCP version.
+      default: "4.22"
+    - name: operator_csv_version
+      description: Name of the CSV of the OpenTelemetry operator in the FBC fragment (the upgrade target)
+      type: string
+      default: "opentelemetry-operator.v0.158.0-3"
+    - name: collector_version
+      description: Version of OpenTelemetry Collector (from opentelemetry-collector in versions.txt)
+      type: string
+      default: "0.158.0"
+    - name: ta_version
+      description: Version of Target Allocator (from targetallocator in versions.txt)
+      type: string
+      default: "0.158.0"
+    - name: otel_tests_branch
+      description: "The branch of openshift/open-telemetry-opentelemetry-operator from which to run the tests"
+      type: string
+      default: "rhosdt-3.11"
+    - name: stage_registry_secret
+      description: Secret of this namespace (type dockerconfigjson) with the credentials of registry.stage.redhat.io
+      default: "stage-registry-creds"
+    - name: compute_node_type
+      description: AWS instance type for ephemeral HyperShift worker nodes
+      default: "m5.2xlarge"
+    - name: hypershift_node_count
+      description: Number of worker nodes for the ephemeral HyperShift cluster
+      default: "3"
+    - name: hosted_management_cluster
+      description: Hosted management cluster used to provision the ephemeral cluster
+      default: "hosted-mgmt2"
+  tasks:
+    - name: parse-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/integration-examples
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/test_metadata.yaml
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+    - name: resolve-ocp-version
+      description: Finds the OCP version of the FBC fragment and compares it with ocp_version
+      runAfter:
+        - parse-metadata
+      params:
+        - name: FBC_FRAGMENT
+          value: $(tasks.parse-metadata.results.component-container-image)
+        - name: OCP_VERSION
+          value: $(params.ocp_version)
+      taskSpec:
+        params:
+          - name: FBC_FRAGMENT
+            type: string
+          - name: OCP_VERSION
+            type: string
+        results:
+          - name: ocp-version
+            description: OCP version of the FBC fragment
+          - name: matches
+            description: '"true" when the FBC fragment is for the OCP version of this scenario'
+        steps:
+          - name: resolve
+            image: quay.io/konflux-ci/konflux-test:v1.4.52@sha256:aa2c97da9bb73a4e8d1c6b41950f8d902b74461be0e042debe89277fdc4ebe49
+            env:
+              - name: FBC_FRAGMENT
+                value: $(params.FBC_FRAGMENT)
+              - name: OCP_VERSION
+                value: $(params.OCP_VERSION)
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+
+              # Only the config blob of the image is read (an FBC image is large). The label
+              # com.redhat.fbc.openshift.version (a JSON array, for example ["v4.14"]) wins when it is set,
+              # otherwise the version label of the operator-registry base image is used (for example v4.21.0).
+              raw=$(skopeo inspect --retry-times 3 --config --override-os linux --override-arch amd64 "docker://${FBC_FRAGMENT}" \
+                | jq -r '.config.Labels["com.redhat.fbc.openshift.version"] // .config.Labels.version // empty')
+              if [ -z "${raw}" ]; then
+                echo "ERROR: no OCP version label on ${FBC_FRAGMENT}"
+                exit 1
+              fi
+              versions=$(echo "${raw}" | tr -d '[]" ' | tr ',' '\n' | sed -E 's/^v//' | cut -d. -f1,2)
+              echo "FBC fragment ${FBC_FRAGMENT} is for OCP: $(echo "${versions}" | tr "\n" " ")"
+              echo "This scenario runs on OCP ${OCP_VERSION}"
+
+              want="${OCP_VERSION#v}"
+              if ! [[ "${want}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+                echo "ERROR: ocp_version must look like 4.22, got '${OCP_VERSION}'"
+                exit 1
+              fi
+
+              echo -n "$(echo "${versions}" | head -n1)" > "$(results.ocp-version.path)"
+              if echo "${versions}" | grep -qxF "${want}"; then
+                echo -n "true" > "$(results.matches.path)"
+              else
+                echo "Skipping: not the OCP version of this scenario."
+                echo -n "false" > "$(results.matches.path)"
+              fi
+    - name: prepare-cluster-env
+      runAfter:
+        - resolve-ocp-version
+      when:
+        - input: $(tasks.resolve-ocp-version.results.matches)
+          operator: in
+          values: ["true"]
+      params:
+        - name: compute_node_type
+          value: $(params.compute_node_type)
+        - name: hypershift_node_count
+          value: $(params.hypershift_node_count)
+        - name: hosted_management_cluster
+          value: $(params.hosted_management_cluster)
+      taskSpec:
+        params:
+          - name: compute_node_type
+            type: string
+          - name: hypershift_node_count
+            type: string
+          - name: hosted_management_cluster
+            type: string
+        results:
+          - name: env
+            description: OpenShift CI workflow environment as JSON
+        steps:
+          - name: prepare-env
+            image: quay.io/konflux-ci/konflux-test:v1.4.52@sha256:aa2c97da9bb73a4e8d1c6b41950f8d902b74461be0e042debe89277fdc4ebe49
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+
+              # The ART images are named registry.redhat.io/rhosdt/*@sha256:... and exist only on the stage
+              # registry until the release is published.
+              image_content_sources=$(cat <<'EOF'
+              - source: registry.redhat.io/rhosdt
+                mirrors:
+                  - registry.stage.redhat.io/rhosdt
+              EOF
+              )
+
+              jq -cn \
+                --arg computeNodeType "$(params.compute_node_type)" \
+                --arg nodeCount "$(params.hypershift_node_count)" \
+                --arg managementCluster "$(params.hosted_management_cluster)" \
+                --arg imageContentSources "$image_content_sources" \
+                '{
+                  COMPUTE_NODE_TYPE: $computeNodeType,
+                  HYPERSHIFT_NODE_COUNT: $nodeCount,
+                  HOSTED_MANAGEMENT_CLUSTER: $managementCluster,
+                  IMAGE_CONTENT_SOURCES: $imageContentSources
+                }' | tee "$(results.env.path)"
+    - name: provision-cluster
+      runAfter:
+        - prepare-cluster-env
+      when:
+        - input: $(tasks.resolve-ocp-version.results.matches)
+          operator: in
+          values: ["true"]
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/openshift/konflux-tasks
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/provision-ephemeral-cluster/0.1/provision-ephemeral-cluster.yaml
+      params:
+        - name: ownerName
+          value: $(context.pipelineRun.name)
+        - name: ownerUid
+          value: $(context.pipelineRun.uid)
+        - name: workflow
+          value: hypershift-hostedcluster-workflow
+        - name: clusterProfile
+          value: aws-konflux-prod
+        - name: timeout
+          value: 1h
+        - name: releases
+          value: >-
+            {"latest":{"release":{"channel":"stable","version":"$(params.ocp_version)","architecture":"multi"}}}
+        - name: env
+          value: $(tasks.prepare-cluster-env.results.env)
+    - name: add-stage-credentials
+      description: Adds the stage registry credentials to the pull secret of the cluster
+      runAfter:
+        - provision-cluster
+      when:
+        - input: $(tasks.resolve-ocp-version.results.matches)
+          operator: in
+          values: ["true"]
+      params:
+        - name: clusterCredentialsSecretRef
+          value: $(tasks.provision-cluster.results.secretRef)
+        - name: stageRegistrySecret
+          value: $(params.stage_registry_secret)
+      taskSpec:
+        params:
+          - name: clusterCredentialsSecretRef
+            type: string
+          - name: stageRegistrySecret
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.clusterCredentialsSecretRef)
+          - name: stage-registry
+            secret:
+              secretName: $(params.stageRegistrySecret)
+        steps:
+          - name: add-pull-secret
+            env:
+              - name: KUBECONFIG
+                value: /credentials/kubeconfig
+            volumeMounts:
+              - name: credentials
+                mountPath: /credentials
+              - name: stage-registry
+                mountPath: /stage
+                readOnly: true
+            image: quay.io/redhat-distributed-tracing-qe/konflux-e2e:latest
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+
+              echo "Adding the stage registry credentials to the pull secret of the cluster"
+
+              # Hosted clusters: HyperShift merges this secret into the global pull secret of the nodes
+              # (OCP versions with the global pull secret feature).
+              oc create secret generic additional-pull-secret -n kube-system \
+                --type=kubernetes.io/dockerconfigjson \
+                --from-file=.dockerconfigjson=/stage/.dockerconfigjson \
+                --dry-run=client -o yaml | oc apply -f -
+
+              # Other clusters: merge the credentials into the pull secret in openshift-config.
+              oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > /tmp/current.json
+              jq -s '.[0] * {auths: (.[0].auths + .[1].auths)}' /tmp/current.json /stage/.dockerconfigjson > /tmp/merged.json
+              oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged.json
+
+              # Wait until the nodes got it, when a syncer runs on the cluster.
+              if oc get daemonset global-pull-secret-syncer -n kube-system >/dev/null 2>&1; then
+                oc rollout status daemonset/global-pull-secret-syncer -n kube-system --timeout=10m
+              else
+                echo "No global-pull-secret-syncer daemonset on this cluster, waiting 2 minutes for the nodes"
+                sleep 120
+              fi
+    - name: opentelemetry-upgrade-tests
+      description: Task to run the upgrade test of the product branch
+      runAfter:
+        - add-stage-credentials
+      when:
+        - input: $(tasks.resolve-ocp-version.results.matches)
+          operator: in
+          values: ["true"]
+      params:
+        - name: OTEL_TESTS_BRANCH
+          value: $(params.otel_tests_branch)
+        - name: COLLECTOR_VERSION
+          value: $(params.collector_version)
+        - name: TA_VERSION
+          value: $(params.ta_version)
+        - name: OPERATOR_CSV_VERSION
+          value: $(params.operator_csv_version)
+        - name: FBC_FRAGMENT
+          value: $(tasks.parse-metadata.results.component-container-image)
+        - name: clusterCredentialsSecretRef
+          value: $(tasks.provision-cluster.results.secretRef)
+      taskSpec:
+        params:
+          - name: OTEL_TESTS_BRANCH
+            type: string
+          - name: COLLECTOR_VERSION
+            type: string
+          - name: TA_VERSION
+            type: string
+          - name: OPERATOR_CSV_VERSION
+            type: string
+          - name: FBC_FRAGMENT
+            type: string
+          - name: clusterCredentialsSecretRef
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.clusterCredentialsSecretRef)
+        steps:
+          - name: run-upgrade-tests
+            volumeMounts:
+              - name: credentials
+                mountPath: /credentials
+            env:
+              - name: KUBECONFIG
+                value: /credentials/kubeconfig
+              - name: OTEL_TESTS_BRANCH
+                value: $(params.OTEL_TESTS_BRANCH)
+              - name: FBC_FRAGMENT
+                value: $(params.FBC_FRAGMENT)
+              - name: COLLECTOR_VERSION
+                value: $(params.COLLECTOR_VERSION)
+              - name: TA_VERSION
+                value: $(params.TA_VERSION)
+              - name: OPERATOR_CSV_VERSION
+                value: $(params.OPERATOR_CSV_VERSION)
+            image: quay.io/redhat-distributed-tracing-qe/konflux-e2e:latest
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+
+              echo "Run upgrade tests"
+              git clone https://github.com/openshift/open-telemetry-opentelemetry-operator.git /tmp/otel-tests
+              cd /tmp/otel-tests
+              git checkout "${OTEL_TESTS_BRANCH}"
+
+              #Enable user workload monitoring
+              oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
+              unset NAMESPACE
+
+              chainsaw test --quiet tests/e2e-openshift-upgrade --values - <<EOF
+              upgrade_fbc_image: ${FBC_FRAGMENT}
+              upgrade_collector_version: ${COLLECTOR_VERSION}
+              upgrade_ta_version: ${TA_VERSION}
+              upgrade_operator_csv_name: ${OPERATOR_CSV_VERSION}
+              EOF

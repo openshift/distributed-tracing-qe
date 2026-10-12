@@ -226,6 +226,7 @@ spec:
           value: $(tasks.prepare-cluster-env.results.env)
     - name: add-stage-credentials
       description: Adds the stage registry credentials to the pull secret of the cluster
+      timeout: "30m"
       runAfter:
         - provision-cluster
       when:
@@ -244,12 +245,16 @@ spec:
           - name: stageRegistrySecret
             type: string
         volumes:
+          # Both secrets are optional so that a missing Secret fails the step with a message below. A missing
+          # required Secret keeps the pod in PodInitializing until the task timeout, without a message.
           - name: credentials
             secret:
               secretName: $(params.clusterCredentialsSecretRef)
+              optional: true
           - name: stage-registry
             secret:
               secretName: $(params.stageRegistrySecret)
+              optional: true
         steps:
           - name: add-pull-secret
             env:
@@ -265,6 +270,15 @@ spec:
             script: |
               #!/bin/bash
               set -euo pipefail
+
+              if [ ! -s /credentials/kubeconfig ]; then
+                echo "ERROR: the Secret $(params.clusterCredentialsSecretRef) with the cluster kubeconfig does not exist or has no kubeconfig key"
+                exit 1
+              fi
+              if [ ! -s /stage/.dockerconfigjson ]; then
+                echo "ERROR: the Secret $(params.stageRegistrySecret) does not exist in this namespace or has no .dockerconfigjson key"
+                exit 1
+              fi
 
               echo "Adding the stage registry credentials to the pull secret of the cluster"
 

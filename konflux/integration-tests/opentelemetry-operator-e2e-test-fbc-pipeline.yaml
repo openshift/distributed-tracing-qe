@@ -46,7 +46,7 @@ spec:
       default: "0.158.0"
     - name: otel_tests_branch
       description: "The branch of openshift/open-telemetry-opentelemetry-operator from which to run the tests"
-      default: "rhosdt-3.11"
+      default: "rhosdt-0.158"
     - name: skip_tests
       description: "Tests to be skipped seperated with a space delimiter"
       default: "tests/e2e/smoke-ip-families tests/e2e-otel/google* tests/e2e-otel/oidcauthextension tests/e2e-otel/*aws* tests/e2e-otel/azuremonitorlogs tests/e2e/smoke-ports tests/e2e-targetallocator/targetallocator-prometheuscr tests/e2e-instrumentation/instrumentation-go tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer-go tests/e2e/httpRoute"

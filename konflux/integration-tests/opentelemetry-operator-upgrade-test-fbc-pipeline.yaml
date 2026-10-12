@@ -44,7 +44,7 @@ spec:
     - name: otel_tests_branch
       description: "The branch of openshift/open-telemetry-opentelemetry-operator from which to run the tests"
       type: string
-      default: "rhosdt-3.11"
+      default: "rhosdt-0.158"
     - name: stage_registry_secret
       description: Secret of this namespace (type dockerconfigjson) with the credentials of registry.stage.redhat.io
       default: "stage-registry-creds"

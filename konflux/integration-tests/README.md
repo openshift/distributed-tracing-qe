@@ -40,7 +40,7 @@ all other tasks are skipped and the run succeeds. So every scenario sees the FBC
 4. `add-stage-credentials` adds the credentials of the Secret `stage-registry-creds` to the pull secret of the cluster.
 5. The e2e pipeline installs the operator (`install-operator-from-fbc`: CatalogSource, OperatorGroup and Subscription in
    `opentelemetry-operator-system`), checks the versions of the images, installs Tempo, AMQ Streams, the Cluster Observability
-   Operator, Loki and OpenShift Logging from `redhat-operators`, and runs the tests (`opentelemetry-e2e-tests`), then the DAST scan.
+   Operator, Loki and OpenShift Logging from `redhat-operators`, runs the DAST scan (`dast-test`, only when `run_dast` is `"true"`) on the cluster with the operators installed, and then runs the tests (`opentelemetry-e2e-tests`).
    The upgrade pipeline runs `opentelemetry-upgrade-tests` after step 4.
 
 The tests are cloned from `openshift/open-telemetry-opentelemetry-operator`, branch `otel_tests_branch`.

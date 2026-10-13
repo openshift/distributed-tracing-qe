@@ -760,7 +760,7 @@ spec:
       description: Task to run the tests of the product branch
       runAfter:
         - check-opentelemetry-version
-        - operators-install
+        - dast-test
       when:
         - input: $(tasks.resolve-ocp-version.results.matches)
           operator: in
@@ -912,9 +912,10 @@ spec:
                 echo "All the tests passed."
               fi
     - name: dast-test
-      description: Task to run Dynamic Application Security Testing (DAST) using RapiDAST
+      description: Task to run Dynamic Application Security Testing (DAST) using RapiDAST. It runs before the tests of the product branch, on the cluster with the operators installed.
       runAfter:
-        - opentelemetry-e2e-tests
+        - check-opentelemetry-version
+        - operators-install
       when:
         - input: $(tasks.resolve-ocp-version.results.matches)
           operator: in

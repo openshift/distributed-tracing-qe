@@ -1061,9 +1061,12 @@ spec:
           - name: credentials
             secret:
               secretName: $(params.clusterCredentialsSecretRef)
+          # The Secret is optional so that a missing Secret fails the step with a message below. A missing
+          # required Secret keeps the pod in PodInitializing until the task timeout, without a message.
           - name: gcs-key
             secret:
               secretName: $(params.rapidastSecret)
+              optional: true
         steps:
           - name: rapidast-scan
             volumeMounts:
@@ -1081,6 +1084,11 @@ spec:
             script: |
               #!/bin/bash
               set -euo pipefail
+
+              if [ ! -s /etc/gcs/sa-key ]; then
+                echo "ERROR: the Secret $(params.rapidastSecret) does not exist in this namespace or has no key sa-key"
+                exit 1
+              fi
 
               echo "Clone distributed-tracing-qe repository"
               git clone https://github.com/openshift/distributed-tracing-qe.git /tmp/distributed-tracing-tests

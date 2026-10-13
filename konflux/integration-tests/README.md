@@ -121,4 +121,5 @@ A run for another OCP version than the one of the scenario ends in seconds with 
 | `provision-cluster` | OpenShift CI did not give a cluster in time, run it again |
 | `add-stage-credentials` | the Secret `stage-registry-creds` or its key is missing in the tenant |
 | `install-operator-from-fbc`, `check-opentelemetry-version` | the FBC or the images are not installable, see the log of the task |
-| `opentelemetry-e2e-tests`, `dast-test`, `opentelemetry-upgrade-tests` | a failure of the tests of the product branch |
+| `dast-test` | with a message that names the Secret: `rapidast-sa-rhosdt-key` or its key `sa-key` is missing in the tenant. Otherwise look at the log of the task: the clone of the repository and the Secret manifest are set up before the scan, so the error can come from the setup or from the scan |
+| `opentelemetry-e2e-tests`, `opentelemetry-upgrade-tests` | a failure of the tests of the product branch |

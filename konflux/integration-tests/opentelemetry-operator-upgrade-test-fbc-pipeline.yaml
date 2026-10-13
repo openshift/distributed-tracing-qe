@@ -207,7 +207,7 @@ spec:
         - name: clusterProfile
           value: aws-konflux-prod
         - name: timeout
-          value: 1h
+          value: 75m
         - name: releases
           value: >-
             {"latest":{"release":{"channel":"stable","version":"$(params.ocp_version)","architecture":"multi"}}}
@@ -360,6 +360,10 @@ spec:
               #Enable user workload monitoring
               oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
               unset NAMESPACE
+
+              # The .chainsaw.yaml of the product branch writes the JUnit report here and chainsaw fails when
+              # the directory does not exist.
+              mkdir -p .testresults/e2e
 
               chainsaw test --quiet tests/e2e-openshift-upgrade --values - <<EOF
               upgrade_fbc_image: ${FBC_FRAGMENT}

@@ -29,22 +29,10 @@ spec:
     - name: ocp_version
       description: OpenShift minor version of the cluster. The pipeline runs only for the FBC of this OCP version.
       default: "4.22"
-    - name: operator_csv_version
-      description: Name of the CSV of the OpenTelemetry operator in the FBC fragment (the upgrade target)
-      type: string
-      default: "opentelemetry-operator.v0.158.0-3"
-    - name: collector_version
-      description: Version of OpenTelemetry Collector (from opentelemetry-collector in versions.txt)
-      type: string
-      default: "0.158.0"
-    - name: ta_version
-      description: Version of Target Allocator (from targetallocator in versions.txt)
-      type: string
-      default: "0.158.0"
     - name: otel_tests_branch
-      description: "The branch of openshift/open-telemetry-opentelemetry-operator from which to run the tests"
+      description: "Optional. The branch of openshift/open-telemetry-opentelemetry-operator from which to run the tests. By default it is rhosdt-<ART version>, the branch of the release of the FBC."
       type: string
-      default: "rhosdt-0.158"
+      default: ""
     - name: stage_registry_secret
       description: Secret of this namespace (type dockerconfigjson) with the credentials of registry.stage.redhat.io
       default: "stage-registry-creds"
@@ -129,9 +117,140 @@ spec:
                 echo "Skipping: not the OCP version of this scenario."
                 echo -n "false" > "$(results.matches.path)"
               fi
-    - name: prepare-cluster-env
+    - name: resolve-release
+      description: Reads the versions of the release under test from the FBC and from the branch of the release, so that the pipeline needs no per-release parameters
       runAfter:
         - resolve-ocp-version
+      when:
+        - input: $(tasks.resolve-ocp-version.results.matches)
+          operator: in
+          values: ["true"]
+      params:
+        - name: APPLICATION_NAME
+          value: $(tasks.parse-metadata.results.application-name)
+        - name: FBC_FRAGMENT
+          value: $(tasks.parse-metadata.results.component-container-image)
+        - name: TESTS_BRANCH_OVERRIDE
+          value: $(params.otel_tests_branch)
+        - name: RHOSDT_VERSION_OVERRIDE
+          value: ""
+      taskSpec:
+        params:
+          - name: APPLICATION_NAME
+            type: string
+          - name: FBC_FRAGMENT
+            type: string
+          - name: TESTS_BRANCH_OVERRIDE
+            type: string
+          - name: RHOSDT_VERSION_OVERRIDE
+            type: string
+        results:
+          - name: art-version
+            description: ART version of the release, for example 0.158
+          - name: tests-branch
+            description: Branch of openshift/open-telemetry-opentelemetry-operator that is tested, for example rhosdt-0.158
+          - name: operator-version
+            description: Version of the operator, from versions.txt of the branch
+          - name: operator-collector-version
+            description: Version of the collector that the operator expects, from versions.txt of the branch
+          - name: operator-targetallocator-version
+            description: Version of the target allocator, from versions.txt of the branch
+          - name: collector-version
+            description: Version of the Red Hat build of the collector, from manifest.yaml of openshift/redhat-opentelemetry-collector
+          - name: csv-name
+            description: Name of the newest CSV in the stable channel of the FBC, for example opentelemetry-operator.v0.158.0-3
+          - name: rhosdt-version
+            description: Version that tags the DAST results, the ART version unless it is overridden
+        steps:
+          - name: resolve
+            image: quay.io/konflux-ci/konflux-test:v1.4.52@sha256:aa2c97da9bb73a4e8d1c6b41950f8d902b74461be0e042debe89277fdc4ebe49
+            env:
+              - name: APPLICATION_NAME
+                value: $(params.APPLICATION_NAME)
+              - name: FBC_FRAGMENT
+                value: $(params.FBC_FRAGMENT)
+              - name: TESTS_BRANCH_OVERRIDE
+                value: $(params.TESTS_BRANCH_OVERRIDE)
+              - name: RHOSDT_VERSION_OVERRIDE
+                value: $(params.RHOSDT_VERSION_OVERRIDE)
+            script: |
+              #!/bin/bash
+              set -euo pipefail
+
+              fail() {
+                echo "ERROR: $*" >&2
+                exit 1
+              }
+
+              # Read a file of a branch of an openshift repository.
+              raw() {
+                curl -fsSL --retry 5 --retry-delay 10 "https://raw.githubusercontent.com/openshift/$1/$2/$3" \
+                  || fail "cannot read $3 on the branch $2 of openshift/$1"
+              }
+
+              # The ART version comes from the application of the Snapshot: fbc-rhosdt-0-158 is 0.158.
+              if [[ ! "${APPLICATION_NAME}" =~ ^fbc-rhosdt-([0-9]+)-([0-9]+)$ ]]; then
+                fail "the application '${APPLICATION_NAME}' does not look like fbc-rhosdt-<major>-<minor>"
+              fi
+              ART_VERSION="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+              RELEASE_BRANCH="rhosdt-${ART_VERSION}"
+              # The branch under test is the branch of the release, unless the scenario sets another one.
+              TESTS_BRANCH="${TESTS_BRANCH_OVERRIDE:-${RELEASE_BRANCH}}"
+
+              # The versions of the operator, the collector and the target allocator.
+              VERSIONS_TXT=$(raw open-telemetry-opentelemetry-operator "${TESTS_BRANCH}" versions.txt)
+              version_of() {
+                local v
+                v=$(awk -F= -v k="$1" '$1 == k {print $2}' <<<"${VERSIONS_TXT}")
+                [[ -n "${v}" ]] || fail "versions.txt on the branch ${TESTS_BRANCH} has no key '$1'"
+                echo -n "${v}"
+              }
+              OPERATOR_VERSION=$(version_of operator)
+              OPERATOR_COLLECTOR_VERSION=$(version_of opentelemetry-collector)
+              OPERATOR_TARGETALLOCATOR_VERSION=$(version_of targetallocator)
+
+              COLLECTOR_VERSION=$(raw redhat-opentelemetry-collector "${RELEASE_BRANCH}" manifest.yaml | yq '.dist.version')
+              [[ -n "${COLLECTOR_VERSION}" && "${COLLECTOR_VERSION}" != "null" ]] \
+                || fail "manifest.yaml on the branch ${RELEASE_BRANCH} of openshift/redhat-opentelemetry-collector has no dist.version"
+
+              # The CSV that the FBC installs is the newest entry of the stable channel. ART adds an entry for every build.
+              WORK=$(mktemp -d)
+              oc image extract "${FBC_FRAGMENT}" --filter-by-os=linux/amd64 --path /configs/:"${WORK}" --confirm >/dev/null \
+                || fail "cannot read the catalog of ${FBC_FRAGMENT}"
+              [[ -d "${WORK}/opentelemetry-product" ]] || fail "the FBC has no opentelemetry-product catalog"
+              CSV_NAME=$(opm render "${WORK}/opentelemetry-product" -o json \
+                | jq -r 'select(.schema == "olm.channel" and .name == "stable") | .entries[].name' | sort -V | tail -n1)
+              [[ "${CSV_NAME}" == opentelemetry-operator.v* ]] || fail "no CSV in the stable channel of the FBC (found '${CSV_NAME}')"
+
+              # The expected versions are read from the branch as it is now. An FBC of an older build installs another operator
+              # version, and its images would fail the version checks for no reason, so stop with a message.
+              CSV_VERSION="${CSV_NAME#opentelemetry-operator.v}"
+              CSV_VERSION="${CSV_VERSION%-*}"
+              [[ "${CSV_VERSION}" == "${OPERATOR_VERSION}" ]] \
+                || fail "the FBC installs the operator ${CSV_VERSION} (${CSV_NAME}), but versions.txt on the branch ${TESTS_BRANCH} says ${OPERATOR_VERSION}: the FBC is older than the branch, the next build is tested"
+
+              RHOSDT_VERSION="${RHOSDT_VERSION_OVERRIDE:-${ART_VERSION}}"
+
+              echo "ART version:                ${ART_VERSION}"
+              echo "Tests branch:               ${TESTS_BRANCH}"
+              echo "Operator:                   ${OPERATOR_VERSION}"
+              echo "Collector (operator):       ${OPERATOR_COLLECTOR_VERSION}"
+              echo "Target allocator:           ${OPERATOR_TARGETALLOCATOR_VERSION}"
+              echo "Collector (Red Hat build):  ${COLLECTOR_VERSION}"
+              echo "CSV (stable channel head):  ${CSV_NAME}"
+              echo "DAST results folder:        rhosdt/${RHOSDT_VERSION}"
+
+              echo -n "${ART_VERSION}" > "$(results.art-version.path)"
+              echo -n "${TESTS_BRANCH}" > "$(results.tests-branch.path)"
+              echo -n "${OPERATOR_VERSION}" > "$(results.operator-version.path)"
+              echo -n "${OPERATOR_COLLECTOR_VERSION}" > "$(results.operator-collector-version.path)"
+              echo -n "${OPERATOR_TARGETALLOCATOR_VERSION}" > "$(results.operator-targetallocator-version.path)"
+              echo -n "${COLLECTOR_VERSION}" > "$(results.collector-version.path)"
+              echo -n "${CSV_NAME}" > "$(results.csv-name.path)"
+              echo -n "${RHOSDT_VERSION}" > "$(results.rhosdt-version.path)"
+    - name: prepare-cluster-env
+      runAfter:
+        - resolve-release
       when:
         - input: $(tasks.resolve-ocp-version.results.matches)
           operator: in
@@ -300,13 +419,13 @@ spec:
           values: ["true"]
       params:
         - name: OTEL_TESTS_BRANCH
-          value: $(params.otel_tests_branch)
+          value: $(tasks.resolve-release.results.tests-branch)
         - name: COLLECTOR_VERSION
-          value: $(params.collector_version)
+          value: $(tasks.resolve-release.results.operator-collector-version)
         - name: TA_VERSION
-          value: $(params.ta_version)
+          value: $(tasks.resolve-release.results.operator-targetallocator-version)
         - name: OPERATOR_CSV_VERSION
-          value: $(params.operator_csv_version)
+          value: $(tasks.resolve-release.results.csv-name)
         - name: FBC_FRAGMENT
           value: $(tasks.parse-metadata.results.component-container-image)
         - name: clusterCredentialsSecretRef

@@ -71,7 +71,7 @@ The optional parameters `otel_tests_branch` and `rhosdt_version` override the br
 are empty by default and are meant for testing a pipeline change or another branch. `otel_tests_branch` applies to the operator
 repository only: the collector version is always read from the `rhosdt-<ART version>` branch of the collector repository. The DAST
 results are uploaded to `rhosdt/<ART version>/otel` in the GCS bucket, not to a folder of the product version, unless `rhosdt_version` is set. `skip_tests` lists the tests that are skipped
-and is the one policy list of the pipeline.
+and is the policy list of the pipeline. The e2e pipeline also skips the LokiStack test (`tests/e2e-openshift/export-to-cluster-logging-lokistack`) on OpenShift 4.16 and older, because the Loki Operator there has no OTLP ingestion. It reads the version from the cluster, so the scenarios need no parameter for it.
 
 ## Secrets in the tenant
 

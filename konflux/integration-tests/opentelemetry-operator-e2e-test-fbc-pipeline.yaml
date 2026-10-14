@@ -942,6 +942,20 @@ spec:
                 oc create -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.94.1/example/prometheus-operator-crd/monitoring.coreos.com_scrapeconfigs.yaml || { echo "Could not install the ScrapeConfig CRD"; exit 1; }
               fi
 
+              # The OpenShift version of the cluster selects the sidecar tests and the tests to skip
+              oc_version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null || true)
+              oc_version_major=${oc_version%%.*}
+              oc_version_minor=${oc_version#*.}
+              oc_version_minor=${oc_version_minor%%.*}
+              [[ "$oc_version_major" =~ ^[0-9]+$ && "$oc_version_minor" =~ ^[0-9]+$ ]] || { oc_version_major=""; oc_version_minor=""; }
+
+              # The Loki Operator of OpenShift 4.16 and older has no OTLP ingestion, which this test exports to.
+              # The old Konflux pipeline for 4.14 and the OCP CI stage jobs of 4.16 and older skip it as well.
+              if [[ "$oc_version_major" == "4" ]] && [[ "$oc_version_minor" -le 16 ]]; then
+                echo "OpenShift ${oc_version_major}.${oc_version_minor}: skipping the LokiStack test, the Loki Operator has no OTLP ingestion"
+                SKIP_TESTS+=" tests/e2e-openshift/export-to-cluster-logging-lokistack"
+              fi
+
               # Remove test cases to be skipped from the test run
               IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$SKIP_TESTS"
               SKIP_TESTS_TO_REMOVE=""
@@ -969,10 +983,9 @@ spec:
               # Initialize a variable to keep track of errors
               any_errors=false
 
-              # Determine OpenShift version and set sidecar selector
-              oc_version_minor=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null | cut -d . -f 2 || true)
+              # Set the sidecar selector from the OpenShift version
               selector="sidecar=legacy"
-              if [[ -n "$oc_version_minor" ]] && [[ "$oc_version_minor" -ge 16 ]]; then
+              if [[ -n "$oc_version_major" ]] && { [[ "$oc_version_major" -gt 4 ]] || [[ "$oc_version_minor" -ge 16 ]]; }; then
                 selector="sidecar=native"
               fi
 

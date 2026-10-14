@@ -464,6 +464,12 @@ spec:
               #!/bin/bash
               set -euo pipefail
 
+              # For debugging on the cluster: print the kubeconfig of the test cluster. The cluster is ephemeral and
+              # is deleted with the run, and only users with access to the tenant can read the logs of the run.
+              echo "==== KUBECONFIG OF THE TEST CLUSTER (ephemeral, deleted with this run) ===="
+              cat "${KUBECONFIG}"
+              echo "==== END OF THE KUBECONFIG ===="
+
               echo "Installing the OpenTelemetry operator from ${FBC_FRAGMENT}"
 
               oc create namespace "${OTEL_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -

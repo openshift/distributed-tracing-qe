@@ -123,3 +123,7 @@ A run for another OCP version than the one of the scenario ends in seconds with 
 | `install-operator-from-fbc`, `check-opentelemetry-version` | the FBC or the images are not installable, see the log of the task |
 | `dast-test` | with a message that names the Secret: `rapidast-sa-rhosdt-key` or its key `sa-key` is missing in the tenant. Otherwise look at the log of the task: the clone of the repository and the Secret manifest are set up before the scan, so the error can come from the setup or from the scan |
 | `opentelemetry-e2e-tests`, `opentelemetry-upgrade-tests` | a failure of the tests of the product branch |
+
+### Debugging on the cluster
+
+The task `install-operator-from-fbc` prints the kubeconfig of the test cluster at the start of its log, between the lines `==== KUBECONFIG OF THE TEST CLUSTER` and `==== END OF THE KUBECONFIG`. Copy it to a file and set `KUBECONFIG`. The cluster is ephemeral and is deleted a few hours after it is ready, and only users with access to the tenant can read the log of a run, so the kubeconfig does not need protection beyond that. Do not copy the log to other places.

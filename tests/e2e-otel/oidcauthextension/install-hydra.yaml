@@ -29,6 +29,14 @@ spec:
           name: public
         - containerPort: 4445
           name: internal
+        # Hydra applies its in-memory migrations after the process starts; until then the
+        # token and discovery endpoints fail and the collectors that depend on them crash.
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: public
+          periodSeconds: 5
+          failureThreshold: 60
 ---
 apiVersion: v1
 kind: Service

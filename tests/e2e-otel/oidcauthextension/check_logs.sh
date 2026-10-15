@@ -45,6 +45,7 @@ while ! $FOUND1 || ! $FOUND2 || ! $FOUND3 || ! $FOUND4; do
             FOUND4=true
         fi
     done
+    sleep 5
 done
 
 echo "Found all the Traces in OpenTelemetry collector."

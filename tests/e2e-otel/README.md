@@ -26,6 +26,7 @@ These test scenarios provide OpenTelemetry component configuration blueprints th
 | [journaldreceiver](./journaldreceiver/) | systemd Journal Logs | System log collection, journal parsing, node-level logs |
 | [otlpjsonfilereceiver](./otlpjsonfilereceiver/) | OTLP JSON File Input | File-based OTLP data ingestion, batch processing |
 | [prometheusremotewritereceiver](./prometheusremotewritereceiver/) | Prometheus Remote Write v2 intake | Accepts RW v2 from OTel exporter; v2-only |
+| [prometheusremotewritereceiver-cluster-monitoring](./prometheusremotewritereceiver-cluster-monitoring/) | OpenShift monitoring metrics via Remote Write v2 | Cluster Monitoring Operator `messageVersion: V2.0` (OpenShift 5.0+), platform and user workload metrics into the receiver |
 | [webhookeventreceiver](./webhookeventreceiver/) | Webhook Events over HTTP | NDJSON splitting, HMAC signature and required header authentication, health check |
 
 ### 🔧 Processors
@@ -46,6 +47,7 @@ These test scenarios provide OpenTelemetry component configuration blueprints th
 | [prometheusremotewriteexporter](./prometheusremotewriteexporter/) | Prometheus Integration | Remote write protocol, metrics export, monitoring integration |
 | [awsxrayexporter](./awsxrayexporter/) | AWS X-Ray Integration | Distributed tracing, AWS cloud integration, service maps |
 | [awscloudwatchlogsexporter](./awscloudwatchlogsexporter/) | AWS CloudWatch Logs | Log aggregation, AWS cloud logging, centralized monitoring |
+| [awsemfexporter-cluster-monitoring](./awsemfexporter-cluster-monitoring/) | OpenShift monitoring metrics to AWS CloudWatch | Remote Write v2 from the monitoring stack in, AWS EMF exporter out, verified with the CloudWatch API |
 | [loadbalancingexporter](./loadbalancingexporter/) | Load Balanced Export | High availability, traffic distribution, resilient telemetry |
 | [googlemanagedprometheus](./googlemanagedprometheus/) | Google Cloud Monitoring | GCP integration, managed Prometheus, cloud-native monitoring |
 | [syslogexporter](./syslogexporter/) | Syslog Export | RFC 5424/3164, TCP/UDP, TLS by default, octet counting |

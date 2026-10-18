@@ -41,6 +41,8 @@ fi
 export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 export AWS_DEFAULT_REGION=${region}
+# The chainsaw step allows 8 minutes; stop polling with a minute to spare.
+script_deadline=$(( $(date +%s) + 420 ))
 
 # Check if retentionInDays is 365
 RETENTION_DAYS=$(aws logs describe-log-groups --log-group-name-prefix $log_group_name --region $region --query "logGroups[?logGroupName=='$log_group_name'].retentionInDays" --output text)
@@ -51,32 +53,67 @@ else
     exit 1
 fi
 
-# Check if the first log record contains the specified string
-MESSAGE=$(aws logs get-log-events --log-group-name $log_group_name --log-stream-name $log_stream_name --region $region --no-paginate --query "events[0].message" --output text)
-if [[ "$MESSAGE" == *"SVTLogger - INFO - app-log-plaintext-rc-"* ]]; then
+# Check that the first log record contains the app log line. CloudWatch Logs can lag behind the
+# exporter, so poll for it.
+logs_found=false
+for attempt in $(seq 1 18); do
+    MESSAGE=$(aws logs get-log-events --log-group-name $log_group_name --log-stream-name $log_stream_name --region $region --no-paginate --query "events[0].message" --output text)
+    if [[ "$MESSAGE" == *"SVTLogger - INFO - app-log-plaintext-rc-"* ]]; then
+        logs_found=true
+        break
+    fi
+    echo "Attempt $attempt/18: no app logs in CloudWatchLogs yet, retrying in 10s..."
+    sleep 10
+done
+if [ "$logs_found" = true ]; then
     echo "App logs found in CloudWatchLogs"
 else
     echo "No app logs found in CloudWatchLogs"
     exit 1
 fi
 
-# Run the AWS CloudWatch command and store the result
-result=$(aws cloudwatch list-metrics --namespace Tracing-EMF --endpoint https://monitoring.us-east-2.amazonaws.com --region=us-east-2 --dimensions Name=telemetrygen,Value=metrics)
+# Check that the EMF exporter published the telemetrygen metric during this test run. Only data
+# points since the metrics job was created count: list-metrics would also return the metric that
+# an earlier run published up to two weeks ago. A new metric can take a few minutes to appear.
+run_start=$(kubectl get job telemetrygen-metrics -n "$NAMESPACE" -o jsonpath='{.metadata.creationTimestamp}')
+if [ -z "$run_start" ]; then
+    echo "Could not determine the start of the test run. Script failed."
+    exit 1
+fi
+search="SEARCH('{Tracing-EMF,telemetrygen} MetricName=\"gen\" \"telemetrygen\"=\"metrics\"', 'SampleCount', 60)"
+found=false
+attempt=0
+while [ "$(date +%s)" -lt "$script_deadline" ]; do
+    attempt=$((attempt + 1))
+    # prints the number of data points and the status codes of the query results
+    if ! output=$(aws cloudwatch get-metric-data --region "$region" --start-time "$run_start" --end-time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --metric-data-queries "[{\"Id\":\"q\",\"Expression\":$(printf '%s' "$search" | jq -R .),\"Period\":60}]" \
+        --query "[sum(MetricDataResults[].length(Values)), join(',', MetricDataResults[].StatusCode)]" --output text 2>&1); then
+        # credential and permission errors do not go away with retries
+        if echo "$output" | grep -q -E 'AccessDenied|UnrecognizedClient|InvalidClientTokenId|ExpiredToken|SignatureDoesNotMatch'; then
+            echo "The CloudWatch query failed: $output. Script failed."
+            exit 1
+        fi
+        echo "Attempt $attempt: the CloudWatch query failed, retrying in 10s: $output"
+    else
+        count=$(echo "$output" | awk '{print $1}')
+        status=$(echo "$output" | awk '{print $2}')
+        if [[ "$status" == *Forbidden* ]]; then
+            echo "CloudWatch returned the status $status for the metric query. Script failed."
+            exit 1
+        fi
+        if [ -n "$count" ] && [ "$count" != "None" ] && [ "$count" -gt 0 ] 2>/dev/null; then
+            found=true
+            break
+        fi
+        echo "Attempt $attempt: no data points since $run_start for the metric with dimension Name 'telemetrygen' and value 'metrics' yet (status $status), retrying in 10s..."
+    fi
+    sleep 10
+done
 
-# Check if the result contains the specific metric
-if echo "$result" | grep -q '"Name": "telemetrygen",'; then
+if [ "$found" = true ]; then
     echo "The metric with dimension Name 'telemetrygen' and value 'metrics' exists. Script succeeded."
 else
     echo "The metric with dimension Name 'telemetrygen' and value 'metrics' does not exist. Script failed."
     exit 1
-fi
-
-
-# Delete the log group
-aws logs delete-log-group --log-group-name $log_group_name --region $region
-if [ $? -ne 0 ]; then
-    echo "Failed to delete log group"
-    exit 1
-else
-    echo "Log group deleted successfully"
 fi

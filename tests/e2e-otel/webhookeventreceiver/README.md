@@ -40,7 +40,7 @@ The test validates that the webhook event receiver can:
 
 ## 🧪 Additional Tests
 
-- [`../webhookeventreceiver-default-endpoint`](../webhookeventreceiver-default-endpoint) (skipped): a receiver without `endpoint` gets the default endpoint from the operator's `webhook_event` parser. Enable it once the operator version used by the tests contains open-telemetry/opentelemetry-operator#5631.
+- [`../webhookeventreceiver-default-endpoint`](../webhookeventreceiver-default-endpoint): a single `webhook_event` receiver whose Service port the operator's `webhook_event` parser (open-telemetry/opentelemetry-operator#5631, operator 0.161.0 and later) takes from `endpoint`. The receiver has no default port, so `endpoint` must be set; without it the operator webhook rejects the collector (`port should not be empty`).
 - Not covered yet: a `path` without a leading `/` should fail config validation cleanly. On collector versions without the fix for open-telemetry/opentelemetry-collector-contrib#50893 the collector panics instead, so a test can only be written once the fix is in the used version.
 
 ## 📝 Notes

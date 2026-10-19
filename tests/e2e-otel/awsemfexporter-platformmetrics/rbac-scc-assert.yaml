@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-node
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-cluster
+---
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: chainsaw-awsemf-platform-metrics-node
+allowPrivilegedContainer: false
+allowHostPID: false
+allowHostDirVolumePlugin: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chainsaw-awsemf-platform-metrics-cluster
+roleRef:
+  kind: ClusterRole
+  name: chainsaw-awsemf-platform-metrics-cluster
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-cluster-service-ca
+data:
+  ("service-ca.crt" != null): true

@@ -1,0 +1,104 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: check-platform-metrics
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      # the job only fetches an HTTP endpoint; it does not need API credentials
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: check-metrics
+        image: mirror.gcr.io/alpine:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        env:
+        - name: CONTROL_PLANE_TOPOLOGY
+          valueFrom:
+            configMapKeyRef:
+              name: check-config
+              key: control_plane_topology
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          set -e
+          ENDPOINT="http://platform-collector:8889/metrics"
+          # metric name followed by a label that proves its origin (extended regexes, braces escaped):
+          # host_metrics and kubelet_stats from the node collectors, k8s_cluster and the prometheus
+          # receiver jobs from the cluster collector; the resource attributes are labels
+          EXPECTED='system_cpu_time_seconds_total\{.*k8s_node_name=
+          system_memory_usage_bytes\{.*state="used"
+          system_filesystem_usage_bytes\{
+          k8s_node_cpu_time_seconds_total\{.*k8s_node_name=
+          k8s_pod_cpu_time_seconds_total\{.*k8s_namespace_name="openshift-
+          container_memory_working_set_bytes\{.*k8s_container_name=
+          k8s_pod_phase\{.*k8s_namespace_name=
+          k8s_container_restarts\{
+          k8s_deployment_available\{
+          k8s_node_condition_ready\{
+          k8s_node_allocatable_cpu\{
+          apiserver_request_total\{.*job="kube-apiserver"
+          up\{.*job="ovn-kubernetes-node"
+          up\{.*job="router-default"
+          up\{.*k8s_cluster_name='
+          case "$CONTROL_PLANE_TOPOLOGY" in
+            External) echo "hosted control plane: the scheduler, controller manager and machine-config daemon are not in the cluster" ;;
+            *) EXPECTED="$EXPECTED
+          scheduler_pending_pods\{.*job=\"kube-scheduler\"
+          workqueue_depth\{.*job=\"kube-controller-manager\"
+          mcd_update_state\{.*job=\"machine-config-daemon\"" ;;
+          esac
+          for i in $(seq 60); do
+            echo "Attempt $i/60: fetching $ENDPOINT"
+            if wget -q -O /tmp/metrics "$ENDPOINT"; then
+              missing=0
+              echo "$EXPECTED" | sed 's/^ *//' | while read -r pattern; do
+                [ -z "$pattern" ] && continue
+                if grep -q -E "^$pattern" /tmp/metrics; then
+                  echo "found: $pattern"
+                else
+                  echo "missing: $pattern"; exit 1
+                fi
+              done || missing=1
+              if [ "$missing" = 0 ]; then
+                # no target of the prometheus receiver may be down
+                if grep -E '^up\{' /tmp/metrics | grep -q ' 0$'; then
+                  echo "scrape targets down:"; grep -E '^up\{' /tmp/metrics | grep ' 0$' | cut -c1-200
+                  echo "(retrying)"
+                else
+                  echo "All platform metrics were collected without the monitoring stack."
+                  echo "Sample:"; grep -E '^(system_cpu_time_seconds_total|k8s_pod_phase|apiserver_request_total)' /tmp/metrics | head -3 | cut -c1-200
+                  exit 0
+                fi
+              fi
+            else
+              echo "metrics endpoint not reachable yet"
+            fi
+            sleep 10
+          done
+          echo "FAIL: expected metrics not found on the collector"
+          exit 1
+      volumes:
+      - name: tmp
+        emptyDir: {}
+  backoffLimit: 1
+  activeDeadlineSeconds: 660

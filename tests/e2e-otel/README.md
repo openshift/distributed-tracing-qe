@@ -22,6 +22,7 @@ These test scenarios provide OpenTelemetry component configuration blueprints th
 | [k8sclusterreceiver](./k8sclusterreceiver/) | Kubernetes Cluster Metrics | Cluster-wide metrics, pod/node status, resource usage |
 | [k8seventsreceiver](./k8seventsreceiver/) | Kubernetes Events | Event collection, cluster monitoring, troubleshooting |
 | [kubeletstatsreceiver](./kubeletstatsreceiver/) | Kubelet Statistics | Container metrics, pod resource usage, node stats |
+| [platformmetrics-collector-only](./platformmetrics-collector-only/) | OpenShift platform metrics without the monitoring stack | `host_metrics` + `kubelet_stats` DaemonSet (kubelet through the API server node proxy), `k8s_cluster` + `prometheus` receiver scraping the control plane with the service account token; nothing from `openshift-monitoring` |
 | [k8sobjectsreceiver](./k8sobjectsreceiver/) | Kubernetes Object Monitoring | Custom resource monitoring, object state tracking |
 | [journaldreceiver](./journaldreceiver/) | systemd Journal Logs | System log collection, journal parsing, node-level logs |
 | [otlpjsonfilereceiver](./otlpjsonfilereceiver/) | OTLP JSON File Input | File-based OTLP data ingestion, batch processing |
@@ -46,6 +47,7 @@ These test scenarios provide OpenTelemetry component configuration blueprints th
 | [prometheusremotewriteexporter](./prometheusremotewriteexporter/) | Prometheus Integration | Remote write protocol, metrics export, monitoring integration |
 | [awsxrayexporter](./awsxrayexporter/) | AWS X-Ray Integration | Distributed tracing, AWS cloud integration, service maps |
 | [awscloudwatchlogsexporter](./awscloudwatchlogsexporter/) | AWS CloudWatch Logs | Log aggregation, AWS cloud logging, centralized monitoring |
+| [awsemfexporter-platformmetrics](./awsemfexporter-platformmetrics/) | OpenShift platform metrics (no monitoring stack) to AWS CloudWatch | The collector-only platform metrics in, AWS EMF exporter out, verified with the CloudWatch API |
 | [loadbalancingexporter](./loadbalancingexporter/) | Load Balanced Export | High availability, traffic distribution, resilient telemetry |
 | [googlemanagedprometheus](./googlemanagedprometheus/) | Google Cloud Monitoring | GCP integration, managed Prometheus, cloud-native monitoring |
 | [syslogexporter](./syslogexporter/) | Syslog Export | RFC 5424/3164, TCP/UDP, TLS by default, octet counting |

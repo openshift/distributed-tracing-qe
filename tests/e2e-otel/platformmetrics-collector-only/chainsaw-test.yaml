@@ -1,0 +1,47 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: platformmetrics-collector-only
+spec:
+  description: "Collect the OpenShift platform metrics with the OTEL collector only (host_metrics, kubelet_stats, k8s_cluster and prometheus receivers), without any component of the openshift-monitoring namespace"
+  # Fixed namespace: the SecurityContextConstraints and the ClusterRoleBindings name the service accounts of this namespace.
+  namespace: chainsaw-platform-metrics
+  steps:
+  - name: Create the service accounts, the security context constraints and the RBAC of the two collectors
+    try:
+    - apply:
+        file: rbac-scc.yaml
+    - assert:
+        file: rbac-scc-assert.yaml
+  - name: Create the cluster collector (k8s_cluster and prometheus receivers, Prometheus exporter for the check)
+    try:
+    - apply:
+        file: cluster-collector.yaml
+    - assert:
+        file: cluster-collector-assert.yaml
+  - name: Create the node collector (host_metrics and kubelet_stats receivers on every node)
+    try:
+    - apply:
+        file: node-collector.yaml
+    - assert:
+        # the first run on a cluster pulls the collector image on every node
+        timeout: 10m
+        file: node-collector-assert.yaml
+  - name: Record whether the control plane runs in the cluster (hosted control planes have no scheduler or controller manager to scrape)
+    try:
+    - script:
+        timeout: 1m
+        content: ./record_control_plane_topology.sh
+  - name: Verify that the node, pod, container, cluster state and control plane metrics reach the collector
+    try:
+    - apply:
+        file: check-metrics.yaml
+    - assert:
+        timeout: 10m
+        file: check-metrics-assert.yaml
+    catch:
+    - podLogs:
+        selector: app.kubernetes.io/managed-by=opentelemetry-operator
+        tail: 50
+    - podLogs:
+        selector: job-name=check-platform-metrics

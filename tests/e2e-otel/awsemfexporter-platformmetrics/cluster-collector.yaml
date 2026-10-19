@@ -1,0 +1,226 @@
+# Cluster collector: the k8s_cluster receiver (cluster object state, distribution openshift) and the
+# prometheus receiver scraping the control plane and cluster operator endpoints with the service account
+# token. The kube-apiserver is verified with the kube root CA (server_name kubernetes), every other
+# endpoint with the service CA (openshift-service-ca.crt); one job per endpoint because the service CA
+# certificates are valid for <service>.<namespace>.svc only and server_name is a per-job setting.
+# The node collectors send their metrics here over OTLP; everything is exported to AWS CloudWatch with the
+# AWS EMF exporter, where check_cloudwatch_metrics.sh verifies it.
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: platform
+spec:
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.158.0
+  mode: deployment
+  serviceAccount: otel-cluster
+  securityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    seccompProfile:
+      type: RuntimeDefault
+    capabilities:
+      drop:
+      - ALL
+  env:
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: aws-credentials
+          key: access_key_id
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: aws-credentials
+          key: secret_access_key
+  resources:
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  volumeMounts:
+  - name: service-ca
+    mountPath: /etc/service-ca
+    readOnly: true
+  volumes:
+  - name: service-ca
+    configMap:
+      name: otel-cluster-service-ca
+  config:
+    extensions:
+      # the operator derives the liveness and readiness probes of the Deployment from this extension
+      health_check:
+        endpoint: 0.0.0.0:13133
+    receivers:
+      otlp:
+        protocols:
+          http:
+            endpoint: 0.0.0.0:4318
+      k8s_cluster:
+        distribution: openshift
+        collection_interval: 15s
+        node_conditions_to_report: [Ready, MemoryPressure]
+        allocatable_types_to_report: [cpu, memory, pods]
+      prometheus:
+        config:
+          global:
+            scrape_interval: 15s
+          scrape_configs:
+            # pattern 1: the kube-apiserver through the kubernetes endpoint in default, kube root CA;
+            # only a few metrics are kept so that the Prometheus exporter stays small
+            - job_name: 'kube-apiserver'
+              scheme: https
+              authorization:
+                credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                server_name: kubernetes
+              kubernetes_sd_configs:
+                - role: endpoints
+                  namespaces:
+                    names: [default]
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+                  regex: kubernetes;https
+                  action: keep
+              metric_relabel_configs:
+                - source_labels: [__name__]
+                  regex: 'apiserver_request_total|apiserver_storage_objects|apiserver_current_inflight_requests'
+                  action: keep
+            # pattern 2: the scheduler and the controller manager, service CA, server_name of the service
+            - job_name: 'kube-scheduler'
+              scheme: https
+              authorization:
+                credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                ca_file: /etc/service-ca/service-ca.crt
+                server_name: scheduler.openshift-kube-scheduler.svc
+              kubernetes_sd_configs:
+                - role: endpoints
+                  namespaces:
+                    names: [openshift-kube-scheduler]
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+                  regex: scheduler;https
+                  action: keep
+                - source_labels: [__meta_kubernetes_pod_node_name]
+                  target_label: node
+              metric_relabel_configs:
+                - source_labels: [__name__]
+                  regex: 'scheduler_pending_pods|scheduler_schedule_attempts_total|scheduler_queue_incoming_pods_total'
+                  action: keep
+            - job_name: 'kube-controller-manager'
+              scheme: https
+              authorization:
+                credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                ca_file: /etc/service-ca/service-ca.crt
+                server_name: kube-controller-manager.openshift-kube-controller-manager.svc
+              kubernetes_sd_configs:
+                - role: endpoints
+                  namespaces:
+                    names: [openshift-kube-controller-manager]
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+                  regex: kube-controller-manager;https
+                  action: keep
+                - source_labels: [__meta_kubernetes_pod_node_name]
+                  target_label: node
+              metric_relabel_configs:
+                - source_labels: [__name__]
+                  regex: 'workqueue_depth|node_collector_evictions_total'
+                  action: keep
+            # pattern 3: kube-rbac-proxy protected DaemonSets of cluster operators
+            - job_name: 'ovn-kubernetes-node'
+              scheme: https
+              authorization:
+                credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                ca_file: /etc/service-ca/service-ca.crt
+                server_name: ovn-kubernetes-node.openshift-ovn-kubernetes.svc
+              kubernetes_sd_configs:
+                - role: endpoints
+                  namespaces:
+                    names: [openshift-ovn-kubernetes]
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+                  regex: ovn-kubernetes-node;metrics
+                  action: keep
+                - source_labels: [__meta_kubernetes_pod_node_name]
+                  target_label: node
+              metric_relabel_configs:
+                - source_labels: [__name__]
+                  regex: 'ovnkube_node_ready_duration_seconds|ovnkube_node_cni_request_duration_seconds_count'
+                  action: keep
+            - job_name: 'machine-config-daemon'
+              scheme: https
+              authorization:
+                credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                ca_file: /etc/service-ca/service-ca.crt
+                server_name: machine-config-daemon.openshift-machine-config-operator.svc
+              kubernetes_sd_configs:
+                - role: endpoints
+                  namespaces:
+                    names: [openshift-machine-config-operator]
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+                  regex: machine-config-daemon;metrics
+                  action: keep
+                - source_labels: [__meta_kubernetes_pod_node_name]
+                  target_label: node
+              metric_relabel_configs:
+                - source_labels: [__name__]
+                  regex: 'mcd_update_state|mcd_pivot_errors_total'
+                  action: keep
+            - job_name: 'router-default'
+              scheme: https
+              authorization:
+                credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                ca_file: /etc/service-ca/service-ca.crt
+                server_name: router-internal-default.openshift-ingress.svc
+              kubernetes_sd_configs:
+                - role: endpoints
+                  namespaces:
+                    names: [openshift-ingress]
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+                  regex: router-internal-default;metrics
+                  action: keep
+              metric_relabel_configs:
+                - source_labels: [__name__]
+                  regex: 'haproxy_frontend_current_sessions|haproxy_up'
+                  action: keep
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 80
+        spike_limit_percentage: 20
+      resource_detection:
+        detectors: [openshift]
+        override: false
+        timeout: 5s
+    exporters:
+      awsemf:
+        namespace: "Tracing-OCP-Platform"
+        log_group_name: ($log_group_name)
+        log_stream_name: ($log_stream_name)
+        log_retention: 1
+        tags: { 'tracing-otel': 'true'}
+        region: "us-east-2"
+        endpoint: "https://logs.us-east-2.amazonaws.com"
+        dimension_rollup_option: "ZeroAndSingleDimensionRollup"
+        # the resource attributes (k8s.node.name, k8s.namespace.name, job) become CloudWatch dimensions
+        resource_to_telemetry_conversion:
+          enabled: true
+        # the AWS EMF exporter has no sending_queue or retry_on_failure settings; it retries itself
+        max_retries: 2
+      debug:
+        verbosity: basic
+    service:
+      extensions: [health_check]
+      pipelines:
+        metrics:
+          receivers: [otlp, k8s_cluster, prometheus]
+          processors: [memory_limiter, resource_detection]
+          exporters: [awsemf, debug]

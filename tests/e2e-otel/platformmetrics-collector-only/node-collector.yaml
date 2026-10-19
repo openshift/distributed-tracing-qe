@@ -1,0 +1,102 @@
+# Node collector: one pod per node with the host_metrics receiver (node metrics from the host filesystem
+# mounted read-only at /hostfs) and the kubelet_stats receiver (node, pod, container and volume metrics).
+# The kubelet is reached through the API server node proxy (auth_type kubeConfig uses the in-cluster
+# configuration), so the TLS connection is verified with the service account CA; no kubelet CA copy and
+# no insecure_skip_verify. The metrics go to the cluster collector over OTLP.
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: node
+spec:
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.158.0
+  mode: daemonset
+  serviceAccount: otel-node
+  securityContext:
+    runAsUser: 0
+    seLinuxOptions:
+      type: spc_t
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    seccompProfile:
+      type: RuntimeDefault
+    capabilities:
+      drop:
+      - ALL
+  tolerations:
+  - operator: Exists
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+  - name: K8S_NODE_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: spec.nodeName
+  volumeMounts:
+  - name: hostfs
+    mountPath: /hostfs
+    readOnly: true
+    mountPropagation: HostToContainer
+  volumes:
+  - name: hostfs
+    hostPath:
+      path: /
+  config:
+    receivers:
+      host_metrics:
+        collection_interval: 15s
+        root_path: /hostfs
+        scrapers:
+          cpu: {}
+          memory: {}
+          load: {}
+          filesystem:
+            exclude_mount_points:
+              match_type: regexp
+              mount_points:
+              - ^/(dev|proc|sys|run|var/lib/kubelet/pods|var/lib/containers/storage/overlay)(/|$)
+            exclude_fs_types:
+              match_type: strict
+              fs_types: [tmpfs, devtmpfs, overlay, squashfs, autofs, nsfs, cgroup, cgroup2, rpc_pipefs]
+          disk: {}
+          network: {}
+          paging: {}
+          processes: {}
+      kubelet_stats:
+        collection_interval: 15s
+        auth_type: kubeConfig
+        endpoint: ${env:K8S_NODE_NAME}
+        metric_groups: [node, pod, container, volume]
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 80
+        spike_limit_percentage: 20
+      resource_detection:
+        detectors: [openshift, k8s_api]
+        override: false
+        timeout: 5s
+    exporters:
+      otlp_http:
+        endpoint: http://platform-collector:4318
+        tls:
+          insecure: true
+        retry_on_failure:
+          enabled: true
+          max_elapsed_time: 0
+        sending_queue:
+          enabled: true
+          sizer: items
+          queue_size: 20000
+          block_on_overflow: true
+          batch:
+            flush_timeout: 5s
+            min_size: 1000
+            max_size: 4000
+    service:
+      pipelines:
+        metrics:
+          receivers: [host_metrics, kubelet_stats]
+          processors: [memory_limiter, resource_detection]
+          exporters: [otlp_http]

@@ -1,0 +1,159 @@
+# Service accounts, security context constraints and RBAC of the two collectors. The operator does not
+# create RBAC for collector service accounts by default and never for the prometheus receiver.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-node
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-cluster
+---
+# Node collector: read-only host filesystem for the host_metrics receiver; no privileged container,
+# no host PID or network, all capabilities dropped. The collector runs as root with the spc_t SELinux
+# type to read /proc and /sys of the host through the hostPath mount.
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: chainsaw-awsemf-platform-metrics-node
+allowPrivilegedContainer: false
+allowPrivilegeEscalation: false
+defaultAllowPrivilegeEscalation: false
+requiredDropCapabilities:
+- ALL
+allowHostDirVolumePlugin: true
+allowHostNetwork: false
+allowHostPID: false
+allowHostIPC: false
+allowHostPorts: false
+readOnlyRootFilesystem: true
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: RunAsAny
+fsGroup:
+  type: RunAsAny
+supplementalGroups:
+  type: RunAsAny
+seccompProfiles:
+- runtime/default
+volumes:
+- configMap
+- downwardAPI
+- emptyDir
+- hostPath
+- projected
+- secret
+users:
+- system:serviceaccount:chainsaw-awsemf-platform-metrics:otel-node
+---
+# Node collector: the kubelet is reached through the API server node proxy (nodes/proxy); the
+# resource_detection processor reads the Infrastructure (openshift detector) and Node (k8s_api detector) objects.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: chainsaw-awsemf-platform-metrics-node
+rules:
+- apiGroups: [""]
+  resources: ["nodes/stats", "nodes/proxy"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  resourceNames: ["kube-system"]
+  verbs: ["get"]
+- apiGroups: ["config.openshift.io"]
+  resources: ["infrastructures", "infrastructures/status"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chainsaw-awsemf-platform-metrics-node
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chainsaw-awsemf-platform-metrics-node
+subjects:
+- kind: ServiceAccount
+  name: otel-node
+  namespace: chainsaw-awsemf-platform-metrics
+---
+# Cluster collector: the k8s_cluster receiver lists and watches the cluster objects; the prometheus
+# receiver discovers the targets and scrapes the platform /metrics endpoints with the service account
+# token (/metrics non-resource URL, plus the resources some kube-rbac-proxy instances authorize on).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: chainsaw-awsemf-platform-metrics-cluster
+rules:
+- nonResourceURLs: ["/metrics", "/metrics/resources"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["namespace/metrics"]
+  verbs: ["get"]
+- apiGroups: ["route.openshift.io"]
+  resources: ["routers/metrics"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources:
+  - events
+  - namespaces
+  - namespaces/status
+  - nodes
+  - nodes/spec
+  - persistentvolumeclaims
+  - persistentvolumes
+  - pods
+  - pods/status
+  - replicationcontrollers
+  - replicationcontrollers/status
+  - resourcequotas
+  - services
+  - endpoints
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["discovery.k8s.io"]
+  resources: ["endpointslices"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["daemonsets", "deployments", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["daemonsets", "deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["quota.openshift.io"]
+  resources: ["clusterresourcequotas"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["config.openshift.io"]
+  resources: ["infrastructures", "infrastructures/status"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chainsaw-awsemf-platform-metrics-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chainsaw-awsemf-platform-metrics-cluster
+subjects:
+- kind: ServiceAccount
+  name: otel-cluster
+  namespace: chainsaw-awsemf-platform-metrics
+---
+# Service CA bundle for the TLS verification of the scheduler, controller manager and operator endpoints
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-cluster-service-ca
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"

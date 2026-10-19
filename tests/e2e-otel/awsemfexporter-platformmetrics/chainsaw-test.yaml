@@ -1,0 +1,67 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: awsemfexporter-platformmetrics
+spec:
+  description: "Collect the OpenShift platform metrics with the OTEL collector only (no monitoring stack) and export them to AWS CloudWatch with the AWS EMF exporter"
+  template: true
+  # Fixed namespace: the SecurityContextConstraints and the ClusterRoleBindings name the service accounts of this namespace.
+  namespace: chainsaw-awsemf-platform-metrics
+  bindings:
+  # the log group and stream carry the cluster's infrastructure name so that parallel CI runs of several
+  # OpenShift versions in the same AWS account and region do not share or delete each other's log group
+  - name: infra_name
+    value: (x_k8s_get($client, 'config.openshift.io/v1', 'Infrastructure', '', 'cluster').status.infrastructureName)
+  - name: log_group_name
+    value: (join('-', ['tracing', $namespace, $infra_name]))
+  - name: log_stream_name
+    value: (join('-', ['tracing', $namespace, $infra_name, 'stream', 'emf']))
+  steps:
+  - name: Create AWS credentials secret
+    try:
+    - script:
+        timeout: 20s
+        content: ./create-aws-creds-secret.sh
+  - name: Create the service accounts, the security context constraints and the RBAC of the two collectors
+    try:
+    - apply:
+        file: rbac-scc.yaml
+    - assert:
+        file: rbac-scc-assert.yaml
+  - name: Create the cluster collector (k8s_cluster and prometheus receivers, AWS EMF exporter)
+    try:
+    - apply:
+        file: cluster-collector.yaml
+    - assert:
+        file: cluster-collector-assert.yaml
+    # runs when the test ends, whatever the outcome of the later steps
+    cleanup:
+    - script:
+        env:
+        - name: log_group_name
+          value: ($log_group_name)
+        timeout: 2m
+        content: ./delete_log_group.sh
+  - name: Create the node collector (host_metrics and kubelet_stats receivers on every node)
+    try:
+    - apply:
+        file: node-collector.yaml
+    - assert:
+        # the first run on a cluster pulls the collector image on every node
+        timeout: 10m
+        file: node-collector-assert.yaml
+  - name: Verify that the node, pod, cluster state and control plane metrics reach CloudWatch
+    try:
+    - script:
+        env:
+        - name: log_group_name
+          value: ($log_group_name)
+        - name: log_stream_name
+          value: ($log_stream_name)
+        # CloudWatch lists new metrics with a delay
+        timeout: 15m
+        content: ./check_cloudwatch_metrics.sh
+    catch:
+    - podLogs:
+        selector: app.kubernetes.io/managed-by=opentelemetry-operator
+        tail: 50

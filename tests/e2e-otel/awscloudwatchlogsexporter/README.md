@@ -95,8 +95,11 @@ The test follows this sequence as defined in [`chainsaw-test.yaml`](./chainsaw-t
 The verification is handled by [`check_logs_metrics.sh`](./check_logs_metrics.sh), which:
 - Validates log groups and streams are created in AWS CloudWatch Logs
 - Confirms application logs are successfully exported and visible in CloudWatch
-- Verifies metrics are exported in EMF format and visible in CloudWatch Metrics
+- Verifies metrics are exported in EMF format and visible in CloudWatch Metrics, counting only data points published since the metrics job of this run was created
+- Polls CloudWatch for the logs and the metrics, which appear with a delay
 - Uses AWS CLI commands to query CloudWatch APIs for validation
+
+The log group is deleted by [`delete_log_group.sh`](./delete_log_group.sh), a `cleanup` hook of the collector step that runs whatever the outcome of the test.
 
 ## 🧹 Cleanup
 

@@ -22,6 +22,14 @@ spec:
         file: otel-collector.yaml
     - assert:
         file: otel-collector-assert.yaml
+    # runs when the test ends, whatever the outcome of the later steps: the exporters create the log group
+    cleanup:
+    - script:
+        env:
+        - name: log_group_name
+          value: ($log_group_name)
+        timeout: 2m
+        content: ./delete_log_group.sh
   - name: Create OTEL sidecar to ship app logs to OTEL collector with CloudWatchLogs exporter
     try:
     - command:
@@ -74,5 +82,5 @@ spec:
           value: ($log_group_name)
         - name: log_stream_name
           value: ($log_stream_name)
-        timeout: 5m
+        timeout: 8m
         content: ./check_logs_metrics.sh

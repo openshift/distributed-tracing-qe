@@ -42,9 +42,13 @@ export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 export AWS_DEFAULT_REGION=${region}
 
+# GNU date (Linux, CI) and BSD date (macOS) use different options to go back in time.
+# X-Ray rejects ranges longer than 24 hours.
+start_time=$(date -u -d '-5 minutes' '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || date -u -v-5M '+%Y-%m-%dT%H:%M:%S')
+
 # Run the AWS CLI command to get trace summaries
 output=$(aws xray get-trace-summaries \
-    --start-time $(date -u -v-1M '+%Y-%m-%dT%H:%M:%S') \
+    --start-time "${start_time}" \
     --end-time $(date -u '+%Y-%m-%dT%H:%M:%S') \
     --filter-expression 'service(id(name: "customer"))' \
     --no-cli-pager)

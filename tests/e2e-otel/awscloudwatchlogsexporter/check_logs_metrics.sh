@@ -53,12 +53,15 @@ else
     exit 1
 fi
 
-# Check that the first log record contains the app log line. CloudWatch Logs can lag behind the
-# exporter, so poll for it.
+# Check that a log record contains the app log line. The EMF exporter writes its metric records to
+# the same log stream, so the app log line is not always the first record. CloudWatch Logs can lag
+# behind the exporter, so poll for it.
 logs_found=false
 for attempt in $(seq 1 18); do
-    MESSAGE=$(aws logs get-log-events --log-group-name $log_group_name --log-stream-name $log_stream_name --region $region --no-paginate --query "events[0].message" --output text)
-    if [[ "$MESSAGE" == *"SVTLogger - INFO - app-log-plaintext-rc-"* ]]; then
+    # Read the whole stream from the start: the CLI follows the page tokens (a page can be partial or empty), and
+    # the end time keeps the paging finite while the exporters still write.
+    MESSAGES=$(aws logs get-log-events --log-group-name $log_group_name --log-stream-name $log_stream_name --region $region --start-from-head --end-time "$(( $(date +%s) * 1000 ))" --query "events[*].message" --output text)
+    if [[ "$MESSAGES" == *"SVTLogger - INFO - app-log-plaintext-rc-"* ]]; then
         logs_found=true
         break
     fi

@@ -40,6 +40,7 @@ These test scenarios provide OpenTelemetry component configuration blueprints th
 | [spanprocessor](./spanprocessor/) | Span Renaming & Status | Rename spans from attributes, override span status |
 | [cumulativetodeltaprocessor](./cumulativetodeltaprocessor/) | Temporality Conversion | Converts cumulative sum/histogram metrics to delta |
 | [redactionprocessor](./redactionprocessor/) | Sensitive Data Redaction | Allow-list attributes, mask blocked values, compliance |
+| [redactionprocessor-hashing](./redactionprocessor-hashing/) | Redaction Hashing and Patterns | SHA3 hashing, ignored keys, allowed values, URL sanitizing |
 
 ### 📤 Exporters
 | Component | Purpose | Key Features |
@@ -69,6 +70,7 @@ These test scenarios provide OpenTelemetry component configuration blueprints th
 | [pprofextension](./pprofextension/) | Go Profiling | Exposes `net/http/pprof` endpoints for live profiling |
 | [jaegerremotesampling](./jaegerremotesampling/) | Remote Sampling Strategies | Serves Jaeger sampling strategies from a local file |
 | [headerssetterextension](./headerssetterextension/) | Header Propagation | Forwards a request header onto an outbound OTLP export |
+| [headerssetterextension-value-sources](./headerssetterextension-value-sources/) | Header Value Sources | Static value, default value and value file headers |
 | [memorylimiterextension](./memorylimiterextension/) | Memory Protection | Rejects requests as receiver middleware when over a memory limit |
 
 ### 🔬 Signal Support (Tech Preview)

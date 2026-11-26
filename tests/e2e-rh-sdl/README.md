@@ -12,8 +12,10 @@ The test suite contains two main test scenarios:
 
 ### 1. rapidast-otel/
 Security testing for OpenTelemetry operator APIs
-- **Target**: OpenTelemetry operator API endpoints (`opentelemetry.io/v1alpha1`)
-- **Scope**: Kubernetes API server endpoints for OTel resources
+- **Target**: OpenTelemetry operator API endpoints (`opentelemetry.io/v1alpha1` and `opentelemetry.io/v1beta1`)
+- **Scope**: Kubernetes API server endpoints for OTel resources. RapiDAST scans one OpenAPI document per run, so the
+  ConfigMap holds a config for each version and the job runs them one after the other. `v1beta1` is the only version
+  that serves `OpenTelemetryCollector` since operator 0.164.0.
 
 ### 2. rapidast-tempo/
 Security testing for Tempo operator APIs

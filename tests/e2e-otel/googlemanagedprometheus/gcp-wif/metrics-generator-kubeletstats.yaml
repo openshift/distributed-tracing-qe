@@ -38,21 +38,21 @@ subjects:
     namespace: chainsaw-kubeletstatsreceiver
 
 ---
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: chainsaw-kubeletstatsreceiver
   namespace: chainsaw-kubeletstatsreceiver
 spec:
   mode: daemonset
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.162.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.164.0
   serviceAccount: chainsaw-kubeletstatsreceiver
   env:
   - name: K8S_NODE_NAME
     valueFrom:
       fieldRef:
         fieldPath: spec.nodeName
-  config: |
+  config:
     receivers:
       kubeletstats:
         collection_interval: 20s

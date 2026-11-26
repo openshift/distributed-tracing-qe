@@ -1,11 +1,11 @@
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: chainsaw-lb-backends
   namespace: chainsaw-lb
 spec:
   replicas: 5
-  config: |
+  config:
     receivers:
       otlp:
         protocols:

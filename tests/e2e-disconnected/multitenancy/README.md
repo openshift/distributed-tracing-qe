@@ -219,13 +219,13 @@ Create tenant-specific collector with authentication:
 
 ```bash
 oc apply -f - <<EOF
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: dev
   namespace: chainsaw-multitenancy
 spec:
-  config: |
+  config:
     extensions:
       bearertokenauth:
         filename: "/var/run/secrets/kubernetes.io/serviceaccount/token"

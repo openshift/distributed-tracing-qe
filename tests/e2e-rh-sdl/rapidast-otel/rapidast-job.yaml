@@ -36,8 +36,16 @@ spec:
         - sh
         - -c
         - |
-          # Run rapidast and process results
-          rapidast.py --log-level debug --config /helm/config/rapidastconfig.yaml
+          # Run rapidast once for each API version of the opentelemetry.io group (v1alpha1 and v1beta1)
+          # and process the results of both. Both scans always run, the job fails at the end if one of them failed,
+          # so that a missing report of one version is not hidden by the clean report of the other.
+          scan_failed=0
+          for config in /helm/config/rapidastconfig-*.yaml; do
+            rapidast.py --log-level debug --config "$config" || {
+              echo "rapidast failed for $config"
+              scan_failed=1
+            }
+          done
           
           # Process JSON report
           report=$(find /opt/rapidast/results/ -name zap-report.json -exec cat {} \;)
@@ -57,6 +65,10 @@ spec:
           echo "rapidast result: riskHigh=$high_count riskMedium=$medium_count"
           if [ "$high_count" -gt 0 ]; then
             echo "High risk alert, please check the scan result report"
+            exit 1
+          fi
+          if [ "$scan_failed" -ne 0 ]; then
+            echo "rapidast did not complete the scan of every API version, please check the log"
             exit 1
           fi
         image: quay.io/redhatproductsecurity/rapidast:latest

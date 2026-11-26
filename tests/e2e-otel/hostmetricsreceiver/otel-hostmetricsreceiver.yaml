@@ -38,15 +38,15 @@ volumes:
 - projected
 
 ---
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: otel-hstmtrs
 spec:
   mode: daemonset
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.162.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.164.0
   serviceAccount: otel-hostfs-daemonset
-  config: |
+  config:
     receivers:
       hostmetrics:
         root_path: /hostfs

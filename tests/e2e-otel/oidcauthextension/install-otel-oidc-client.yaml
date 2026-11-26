@@ -1,9 +1,9 @@
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: chainsaw-oidc-client
 spec:
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.162.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.164.0
   mode: deployment
   volumes:
     - name: chainsaw-certs
@@ -12,7 +12,7 @@ spec:
   volumeMounts:
     - name: chainsaw-certs
       mountPath: /certs
-  config: |
+  config:
     extensions:
       oauth2client:
         client_id: tenant1-oidc-client

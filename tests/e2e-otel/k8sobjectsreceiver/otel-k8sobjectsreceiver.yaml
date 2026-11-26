@@ -49,16 +49,16 @@ subjects:
     namespace: chainsaw-k8sobjectsreceiver
 
 ---
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: chainsaw-k8sobjectsreceiver
   namespace: chainsaw-k8sobjectsreceiver
 spec:
   mode: deployment
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.162.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.164.0
   serviceAccount: chainsaw-k8sobjectsreceiver
-  config: |
+  config:
     receivers:
       k8sobjects:
         objects:

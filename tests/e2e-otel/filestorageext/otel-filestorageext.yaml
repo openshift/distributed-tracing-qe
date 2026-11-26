@@ -1,10 +1,10 @@
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: filestorageext
 spec:
   mode: deployment
-  config: |
+  config:
     receivers:
       otlp:
         protocols:
@@ -22,14 +22,14 @@ spec:
           exporters: [debug]
 
 ---
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: filestorageext-sidecar
 spec:
   mode: sidecar
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.162.0
-  config: |
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.164.0
+  config:
     receivers:
       filelog:
         storage: file_storage

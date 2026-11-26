@@ -133,7 +133,7 @@ subjects:
     namespace: chainsaw-k8sleaderelectorext
 
 ---
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: chainsaw-k8sleaderelectorext
@@ -141,9 +141,9 @@ metadata:
 spec:
   mode: deployment
   replicas: 2
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.162.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.164.0
   serviceAccount: chainsaw-k8sleaderelectorext
-  config: |
+  config:
     extensions:
       k8s_leader_elector:
         auth_type: serviceAccount

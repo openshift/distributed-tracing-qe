@@ -1,12 +1,12 @@
 # based on config/samples/otelcol_v1alpha1_openshift.yaml
 ---
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: dev
   namespace: chainsaw-multitenancy
 spec:
-  config: |
+  config:
     extensions:
       bearertokenauth:
         filename: "/var/run/secrets/kubernetes.io/serviceaccount/token"

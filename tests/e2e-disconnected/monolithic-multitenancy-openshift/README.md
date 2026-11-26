@@ -279,13 +279,13 @@ kind: ServiceAccount
 metadata:
   name: dev-collector
 ---
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: dev
 spec:
   serviceAccount: dev-collector
-  config: |
+  config:
     extensions:
       bearertokenauth:
         filename: /var/run/secrets/kubernetes.io/serviceaccount/token

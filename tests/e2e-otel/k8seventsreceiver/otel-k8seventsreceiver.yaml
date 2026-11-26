@@ -96,16 +96,16 @@ subjects:
     namespace: chainsaw-k8seventsreceiver
 
 ---
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: chainsaw-k8seventsreceiver
   namespace: chainsaw-k8seventsreceiver
 spec:
   mode: deployment
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.162.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.164.0
   serviceAccount: chainsaw-k8seventsreceiver
-  config: |
+  config:
     receivers:
       otlp:
         protocols:
